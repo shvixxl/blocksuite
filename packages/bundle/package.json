@@ -1,0 +1,20 @@
+{
+  "name": "@blocksuite/bundle",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@blocksuite/blocks": "workspace:*",
+    "@blocksuite/presets": "workspace:*",
+    "@blocksuite/store": "workspace:*",
+    "@blocksuite/templates": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.2",
+    "vite": "^5.2.0"
+  }
+}

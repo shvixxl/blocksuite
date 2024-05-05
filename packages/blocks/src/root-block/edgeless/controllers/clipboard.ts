@@ -41,9 +41,11 @@ import {
 import type { EmbedFigmaModel } from '../../../embed-figma-block/embed-figma-model.js';
 import type { EmbedGithubModel } from '../../../embed-github-block/embed-github-model.js';
 import type { EmbedHtmlModel } from '../../../embed-html-block/embed-html-model.js';
-import type { EmbedLinkedDocModel } from '../../../embed-linked-doc-block/embed-linked-doc-model.js';
+// NOTE: disabled for bundle
+// import type { EmbedLinkedDocModel } from '../../../embed-linked-doc-block/embed-linked-doc-model.js';
 import type { EmbedLoomModel } from '../../../embed-loom-block/embed-loom-model.js';
-import type { EmbedSyncedDocModel } from '../../../embed-synced-doc-block/embed-synced-doc-model.js';
+// NOTE: disabled for bundle
+// import type { EmbedSyncedDocModel } from '../../../embed-synced-doc-block/embed-synced-doc-model.js';
 import type { EmbedYoutubeModel } from '../../../embed-youtube-block/embed-youtube-model.js';
 import type { FrameBlockModel } from '../../../frame-block/frame-model.js';
 import type { ImageBlockModel } from '../../../image-block/image-model.js';
@@ -79,9 +81,11 @@ import {
   isEmbedFigmaBlock,
   isEmbedGithubBlock,
   isEmbedHtmlBlock,
-  isEmbedLinkedDocBlock,
+  // NOTE: disabled for bundle
+  // isEmbedLinkedDocBlock,
   isEmbedLoomBlock,
-  isEmbedSyncedDocBlock,
+  // NOTE: disabled for bundle
+  // isEmbedSyncedDocBlock,
   isEmbedYoutubeBlock,
   isFrameBlock,
   isImageBlock,
@@ -683,42 +687,44 @@ export class EdgelessClipboardController extends PageClipboard {
     return embedFigmaIds;
   }
 
-  private _createLinkedDocEmbedBlocks(linkedDocEmbeds: BlockSnapshot[]) {
-    const embedLinkedDocIds = linkedDocEmbeds.map(({ props }) => {
-      const { xywh, style, caption, pageId } = props;
+  // NOTE: disabled for bundle
+  // private _createLinkedDocEmbedBlocks(linkedDocEmbeds: BlockSnapshot[]) {
+  //   const embedLinkedDocIds = linkedDocEmbeds.map(({ props }) => {
+  //     const { xywh, style, caption, pageId } = props;
 
-      return this.host.service.addBlock(
-        'affine:embed-linked-doc',
-        {
-          xywh,
-          style,
-          caption,
-          pageId,
-        },
-        this.surface.model.id
-      );
-    });
-    return embedLinkedDocIds;
-  }
+  //     return this.host.service.addBlock(
+  //       'affine:embed-linked-doc',
+  //       {
+  //         xywh,
+  //         style,
+  //         caption,
+  //         pageId,
+  //       },
+  //       this.surface.model.id
+  //     );
+  //   });
+  //   return embedLinkedDocIds;
+  // }
 
-  private _createSyncedDocEmbedBlocks(syncedDocEmbeds: BlockSnapshot[]) {
-    const embedSyncedDocIds = syncedDocEmbeds.map(({ props }) => {
-      const { xywh, style, caption, scale, pageId } = props;
+  // NOTE: disabled for bundle
+  // private _createSyncedDocEmbedBlocks(syncedDocEmbeds: BlockSnapshot[]) {
+  //   const embedSyncedDocIds = syncedDocEmbeds.map(({ props }) => {
+  //     const { xywh, style, caption, scale, pageId } = props;
 
-      return this.host.service.addBlock(
-        'affine:embed-synced-doc',
-        {
-          xywh,
-          style,
-          caption,
-          scale,
-          pageId,
-        },
-        this.surface.model.id
-      );
-    });
-    return embedSyncedDocIds;
-  }
+  //     return this.host.service.addBlock(
+  //       'affine:embed-synced-doc',
+  //       {
+  //         xywh,
+  //         style,
+  //         caption,
+  //         scale,
+  //         pageId,
+  //       },
+  //       this.surface.model.id
+  //     );
+  //   });
+  //   return embedSyncedDocIds;
+  // }
 
   private _createHtmlEmbedBlocks(htmlEmbeds: BlockSnapshot[]) {
     const embedHtmlIds = htmlEmbeds.map(({ props }) => {
@@ -812,15 +818,16 @@ export class EdgelessClipboardController extends PageClipboard {
                     ? 'youtubeEmbeds'
                     : isEmbedFigmaBlock(data as unknown as Selectable)
                       ? 'figmaEmbeds'
-                      : isEmbedLinkedDocBlock(data as unknown as Selectable)
-                        ? 'linkedDocEmbeds'
-                        : isEmbedSyncedDocBlock(data as unknown as Selectable)
-                          ? 'syncedDocEmbeds'
-                          : isEmbedHtmlBlock(data as unknown as Selectable)
-                            ? 'htmlEmbeds'
-                            : isEmbedLoomBlock(data as unknown as Selectable)
-                              ? 'loomEmbeds'
-                              : 'elements'
+                      : // NOTE: disabled for bundle
+                        // : isEmbedLinkedDocBlock(data as unknown as Selectable)
+                        //   ? 'linkedDocEmbeds'
+                        //   : isEmbedSyncedDocBlock(data as unknown as Selectable)
+                        //     ? 'syncedDocEmbeds'
+                        isEmbedHtmlBlock(data as unknown as Selectable)
+                        ? 'htmlEmbeds'
+                        : isEmbedLoomBlock(data as unknown as Selectable)
+                          ? 'loomEmbeds'
+                          : 'elements'
     ) as unknown as {
       frames: BlockSnapshot[];
       notes?: BlockSnapshot[];
@@ -870,12 +877,13 @@ export class EdgelessClipboardController extends PageClipboard {
     const embedFigmaIds = this._createFigmaEmbedBlocks(
       groupedByType.figmaEmbeds ?? []
     );
-    const embedLinkedDocIds = this._createLinkedDocEmbedBlocks(
-      groupedByType.linkedDocEmbeds ?? []
-    );
-    const embedSyncedDocIds = this._createSyncedDocEmbedBlocks(
-      groupedByType.syncedDocEmbeds ?? []
-    );
+    // NOTE: disabled for bundle
+    // const embedLinkedDocIds = this._createLinkedDocEmbedBlocks(
+    //   groupedByType.linkedDocEmbeds ?? []
+    // );
+    // const embedSyncedDocIds = this._createSyncedDocEmbedBlocks(
+    //   groupedByType.syncedDocEmbeds ?? []
+    // );
     const embedHtmlIds = this._createHtmlEmbedBlocks(
       groupedByType.htmlEmbeds ?? []
     );
@@ -915,13 +923,14 @@ export class EdgelessClipboardController extends PageClipboard {
       this.host.service.getElementById(id)
     ) as EmbedFigmaModel[];
 
-    const linkedDocEmbeds = embedLinkedDocIds.map(id =>
-      this.host.service.getElementById(id)
-    ) as EmbedLinkedDocModel[];
+    // NOTE: disabled for bundle
+    // const linkedDocEmbeds = embedLinkedDocIds.map(id =>
+    //   this.host.service.getElementById(id)
+    // ) as EmbedLinkedDocModel[];
 
-    const syncedDocEmbeds = embedSyncedDocIds.map(id =>
-      this.host.service.getElementById(id)
-    ) as EmbedSyncedDocModel[];
+    // const syncedDocEmbeds = embedSyncedDocIds.map(id =>
+    //   this.host.service.getElementById(id)
+    // ) as EmbedSyncedDocModel[];
 
     const htmlEmbeds = embedHtmlIds.map(id =>
       this.host.service.getElementById(id)
@@ -946,8 +955,9 @@ export class EdgelessClipboardController extends PageClipboard {
       ...githubEmbeds,
       ...youtubeEmbeds,
       ...figmaEmbeds,
-      ...linkedDocEmbeds,
-      ...syncedDocEmbeds,
+      // NOTE: disabled for bundle
+      // ...linkedDocEmbeds,
+      // ...syncedDocEmbeds,
       ...htmlEmbeds,
       ...loomEmbeds,
     ];
@@ -1445,12 +1455,13 @@ export async function prepareClipboardData(
       } else if (isEmbedFigmaBlock(selected)) {
         const snapshot = await job.blockToSnapshot(selected);
         return { ...snapshot };
-      } else if (isEmbedLinkedDocBlock(selected)) {
-        const snapshot = await job.blockToSnapshot(selected);
-        return { ...snapshot };
-      } else if (isEmbedSyncedDocBlock(selected)) {
-        const snapshot = await job.blockToSnapshot(selected);
-        return { ...snapshot };
+        // NOTE: disabled for bundle
+        // } else if (isEmbedLinkedDocBlock(selected)) {
+        //   const snapshot = await job.blockToSnapshot(selected);
+        //   return { ...snapshot };
+        // } else if (isEmbedSyncedDocBlock(selected)) {
+        //   const snapshot = await job.blockToSnapshot(selected);
+        //   return { ...snapshot };
       } else if (isEmbedHtmlBlock(selected)) {
         const snapshot = await job.blockToSnapshot(selected);
         return { ...snapshot };

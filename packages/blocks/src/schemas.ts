@@ -13,9 +13,11 @@ import { DividerBlockSchema } from './divider-block/divider-model.js';
 import { EmbedFigmaBlockSpec } from './embed-figma-block/embed-figma-spec.js';
 import { EmbedGithubBlockSpec } from './embed-github-block/embed-github-spec.js';
 import { EmbedHtmlBlockSpec } from './embed-html-block/embed-html-spec.js';
-import { EmbedLinkedDocBlockSpec } from './embed-linked-doc-block/embed-linked-doc-spec.js';
+// NOTE: disabled for bundle
+// import { EmbedLinkedDocBlockSpec } from './embed-linked-doc-block/embed-linked-doc-spec.js';
 import { EmbedLoomBlockSpec } from './embed-loom-block/embed-loom-spec.js';
-import { EmbedSyncedDocBlockSpec } from './embed-synced-doc-block/embed-synced-doc-spec.js';
+// NOTE: disabled for bundle
+// import { EmbedSyncedDocBlockSpec } from './embed-synced-doc-block/embed-synced-doc-spec.js';
 import { EmbedYoutubeBlockSpec } from './embed-youtube-block/embed-youtube-spec.js';
 import { FrameBlockSchema } from './frame-block/frame-model.js';
 import { ImageBlockSchema } from './image-block/image-model.js';
@@ -46,7 +48,8 @@ export const AffineSchemas: z.infer<typeof BlockSchema>[] = [
   EmbedFigmaBlockSpec.schema,
   EmbedGithubBlockSpec.schema,
   EmbedHtmlBlockSpec.schema,
-  EmbedLinkedDocBlockSpec.schema,
-  EmbedSyncedDocBlockSpec.schema,
+  // NOTE: disabled for bundle
+  // EmbedLinkedDocBlockSpec.schema,
+  // EmbedSyncedDocBlockSpec.schema,
   EmbedLoomBlockSpec.schema,
 ];

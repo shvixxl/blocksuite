@@ -7,6 +7,202 @@
   unicode-range: U+1F000-1F644, U+203C-3299;
 }
 
+@font-face {
+  font-family: 'Inter';
+  src: url(https://cdn.affine.pro/fonts/Inter-Light-BETA.woff);
+  font-weight: 300;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url(https://cdn.affine.pro/fonts/Inter-Regular.woff);
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url(https://cdn.affine.pro/fonts/Inter-SemiBold.woff);
+  font-weight: 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url(https://cdn.affine.pro/fonts/Inter-LightItalic-BETA.woff);
+  font-weight: 300;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url(https://cdn.affine.pro/fonts/Inter-Italic.woff);
+  font-weight: 400;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url(https://cdn.affine.pro/fonts/Inter-SemiBoldItalic.woff);
+  font-weight: 600;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'Kalam';
+  src: url(https://cdn.affine.pro/fonts/Kalam-Light.woff);
+  font-weight: 300;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Kalam';
+  src: url(https://cdn.affine.pro/fonts/Kalam-Regular.woff);
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Kalam';
+  src: url(https://cdn.affine.pro/fonts/Kalam-Bold.woff);
+  font-weight: 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Satoshi';
+  src: url(https://cdn.affine.pro/fonts/Satoshi-Light.woff);
+  font-weight: 300;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Satoshi';
+  src: url(https://cdn.affine.pro/fonts/Satoshi-Regular.woff);
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Satoshi';
+  src: url(https://cdn.affine.pro/fonts/Satoshi-Bold.woff);
+  font-weight: 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Satoshi';
+  src: url(https://cdn.affine.pro/fonts/Satoshi-LightItalic.woff);
+  font-weight: 300;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'Satoshi';
+  src: url(https://cdn.affine.pro/fonts/Satoshi-Italic.woff);
+  font-weight: 400;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'Satoshi';
+  src: url(https://cdn.affine.pro/fonts/Satoshi-BoldItalic.woff);
+  font-weight: 600;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url(https://cdn.affine.pro/fonts/Poppins-Light.woff);
+  font-weight: 300;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url(https://cdn.affine.pro/fonts/Poppins-Regular.woff);
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url(https://cdn.affine.pro/fonts/Poppins-SemiBold.woff);
+  font-weight: 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url(https://cdn.affine.pro/fonts/Poppins-LightItalic.woff);
+  font-weight: 300;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url(https://cdn.affine.pro/fonts/Poppins-Italic.woff);
+  font-weight: 400;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'Poppins';
+  src: url(https://cdn.affine.pro/fonts/Poppins-SemiBoldItalic.woff);
+  font-weight: 600;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'Lora';
+  src: url(https://cdn.affine.pro/fonts/Lora-Regular.woff);
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Lora';
+  src: url(https://cdn.affine.pro/fonts/Lora-Bold.woff);
+  font-weight: 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Lora';
+  src: url(https://cdn.affine.pro/fonts/Lora-Italic.woff);
+  font-weight: 400;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'Lora';
+  src: url(https://cdn.affine.pro/fonts/Lora-BoldItalic.woff);
+  font-weight: 600;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'Bebas Neue';
+  src: url(https://cdn.affine.pro/fonts/BebasNeue-Light.woff);
+  font-weight: 300;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Bebas Neue';
+  src: url(https://cdn.affine.pro/fonts/BebasNeue-Regular.woff);
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Orelega One';
+  src: url(https://cdn.affine.pro/fonts/OrelegaOne-Regular.woff);
+  font-weight: 400;
+  font-style: normal;
+}
+
 .dg > ul {
   overflow: scroll;
 }

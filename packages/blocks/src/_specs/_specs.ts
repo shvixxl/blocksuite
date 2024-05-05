@@ -15,9 +15,11 @@ import { DividerBlockSchema } from '../divider-block/divider-model.js';
 import { EmbedFigmaBlockSpec } from '../embed-figma-block/embed-figma-spec.js';
 import { EmbedGithubBlockSpec } from '../embed-github-block/index.js';
 import { EmbedHtmlBlockSpec } from '../embed-html-block/embed-html-spec.js';
-import { EmbedLinkedDocBlockSpec } from '../embed-linked-doc-block/embed-linked-doc-spec.js';
+// NOTE: disabled for bundle
+// import { EmbedLinkedDocBlockSpec } from '../embed-linked-doc-block/embed-linked-doc-spec.js';
 import { EmbedLoomBlockSpec } from '../embed-loom-block/embed-loom-spec.js';
-import { EmbedSyncedDocBlockSpec } from '../embed-synced-doc-block/embed-synced-doc-spec.js';
+// NOTE: disabled for bundle
+// import { EmbedSyncedDocBlockSpec } from '../embed-synced-doc-block/embed-synced-doc-spec.js';
 import { EmbedYoutubeBlockSpec } from '../embed-youtube-block/embed-youtube-spec.js';
 import { FrameBlockSchema } from '../frame-block/frame-model.js';
 import { ImageBlockSchema } from '../image-block/image-model.js';
@@ -43,7 +45,8 @@ import { EDGELESS_ELEMENT_TOOLBAR_WIDGET } from '../root-block/widgets/element-t
 import { EMBED_CARD_TOOLBAR } from '../root-block/widgets/embed-card-toolbar/embed-card-toolbar.js';
 import { AFFINE_FORMAT_BAR_WIDGET } from '../root-block/widgets/format-bar/format-bar.js';
 import { AFFINE_INNER_MODAL_WIDGET } from '../root-block/widgets/inner-modal/inner-modal.js';
-import { AFFINE_LINKED_DOC_WIDGET } from '../root-block/widgets/linked-doc/index.js';
+// NOTE: disabled for bundle
+// import { AFFINE_LINKED_DOC_WIDGET } from '../root-block/widgets/linked-doc/index.js';
 import { AFFINE_MODAL_WIDGET } from '../root-block/widgets/modal/modal.js';
 import { AFFINE_PAGE_DRAGGING_AREA_WIDGET } from '../root-block/widgets/page-dragging-area/page-dragging-area.js';
 import { AFFINE_PIE_MENU_WIDGET } from '../root-block/widgets/pie-menu/index.js';
@@ -72,9 +75,10 @@ const DocPageSpec: BlockSpec<PageRootBlockWidgetName> = {
       [AFFINE_SLASH_MENU_WIDGET]: literal`${unsafeStatic(
         AFFINE_SLASH_MENU_WIDGET
       )}`,
-      [AFFINE_LINKED_DOC_WIDGET]: literal`${unsafeStatic(
-        AFFINE_LINKED_DOC_WIDGET
-      )}`,
+      // NOTE: disabled for bundle
+      // [AFFINE_LINKED_DOC_WIDGET]: literal`${unsafeStatic(
+      //   AFFINE_LINKED_DOC_WIDGET
+      // )}`,
       [AFFINE_DRAG_HANDLE_WIDGET]: literal`${unsafeStatic(
         AFFINE_DRAG_HANDLE_WIDGET
       )}`,
@@ -106,9 +110,10 @@ const EdgelessPageSpec: BlockSpec<EdgelessRootBlockWidgetName> = {
       [AFFINE_SLASH_MENU_WIDGET]: literal`${unsafeStatic(
         AFFINE_SLASH_MENU_WIDGET
       )}`,
-      [AFFINE_LINKED_DOC_WIDGET]: literal`${unsafeStatic(
-        AFFINE_LINKED_DOC_WIDGET
-      )}`,
+      // NOTE: disabled for bundle
+      // [AFFINE_LINKED_DOC_WIDGET]: literal`${unsafeStatic(
+      //   AFFINE_LINKED_DOC_WIDGET
+      // )}`,
       [AFFINE_DRAG_HANDLE_WIDGET]: literal`${unsafeStatic(
         AFFINE_DRAG_HANDLE_WIDGET
       )}`,
@@ -209,8 +214,9 @@ const CommonFirstPartyBlockSpecs: BlockSpec[] = [
   EmbedYoutubeBlockSpec,
   EmbedLoomBlockSpec,
   EmbedHtmlBlockSpec,
-  EmbedSyncedDocBlockSpec,
-  EmbedLinkedDocBlockSpec,
+  // NOTE: disabled for bundle
+  // EmbedSyncedDocBlockSpec,
+  // EmbedLinkedDocBlockSpec,
 ];
 
 export const PageEditorBlockSpecs: BlockSpec[] = [

@@ -4,15 +4,18 @@ import type { EditorHost } from '@blocksuite/block-std';
 import { assertExists } from '@blocksuite/global/utils';
 import { html, type TemplateResult } from 'lit';
 
+// NOTE: disabled for bundle
 import { matchFlavours } from '../../../_common/utils/model.js';
 import { createSimplePortal } from '../../components/portal.js';
 import { toast } from '../../components/toast.js';
 import {
   CopyIcon,
   DatabaseTableViewIcon20,
-  FontLinkedDocIcon,
+  // NOTE: disabled for bundle
+  // FontLinkedDocIcon,
 } from '../../icons/index.js';
-import { createLinkedDocFromSelectedBlocks } from '../../utils/render-linked-doc.js';
+// NOTE: disabled for bundle
+// import { createLinkedDocFromSelectedBlocks } from '../../utils/render-linked-doc.js';
 import { DATABASE_CONVERT_WHITE_LIST } from './database-convert-view.js';
 
 export interface QuickActionConfig {
@@ -94,49 +97,50 @@ export const quickActionConfig: QuickActionConfig[] = [
       });
     },
   },
-  {
-    id: 'convert-to-linked-doc',
-    name: 'Create Linked Doc',
-    icon: FontLinkedDocIcon,
-    hotkey: `Mod-Shift-l`,
-    showWhen: host => {
-      const [_, ctx] = host.std.command
-        .chain()
-        .getSelectedModels({
-          types: ['block'],
-        })
-        .run();
-      const { selectedModels } = ctx;
-      return !!selectedModels && selectedModels.length > 0;
-    },
-    enabledWhen: host => {
-      const [_, ctx] = host.std.command
-        .chain()
-        .getSelectedModels({
-          types: ['block'],
-        })
-        .run();
-      const { selectedModels } = ctx;
-      return !!selectedModels && selectedModels.length > 0;
-    },
-    action: host => {
-      const [_, ctx] = host.std.command
-        .chain()
-        .getSelectedModels({
-          types: ['block'],
-          mode: 'highest',
-        })
-        .run();
-      const { selectedModels } = ctx;
-      assertExists(selectedModels);
-      if (!selectedModels.length) return;
+  // NOTE: disabled for bundle
+  // {
+  //   id: 'convert-to-linked-doc',
+  //   name: 'Create Linked Doc',
+  //   icon: FontLinkedDocIcon,
+  //   hotkey: `Mod-Shift-l`,
+  //   showWhen: host => {
+  //     const [_, ctx] = host.std.command
+  //       .chain()
+  //       .getSelectedModels({
+  //         types: ['block'],
+  //       })
+  //       .run();
+  //     const { selectedModels } = ctx;
+  //     return !!selectedModels && selectedModels.length > 0;
+  //   },
+  //   enabledWhen: host => {
+  //     const [_, ctx] = host.std.command
+  //       .chain()
+  //       .getSelectedModels({
+  //         types: ['block'],
+  //       })
+  //       .run();
+  //     const { selectedModels } = ctx;
+  //     return !!selectedModels && selectedModels.length > 0;
+  //   },
+  //   action: host => {
+  //     const [_, ctx] = host.std.command
+  //       .chain()
+  //       .getSelectedModels({
+  //         types: ['block'],
+  //         mode: 'highest',
+  //       })
+  //       .run();
+  //     const { selectedModels } = ctx;
+  //     assertExists(selectedModels);
+  //     if (!selectedModels.length) return;
 
-      host.selection.clear();
+  //     host.selection.clear();
 
-      const doc = host.doc;
-      const linkedDoc = createLinkedDocFromSelectedBlocks(doc, selectedModels);
-      const linkedDocService = host.spec.getService('affine:embed-linked-doc');
-      linkedDocService.slots.linkedDocCreated.emit({ docId: linkedDoc.id });
-    },
-  },
+  //     const doc = host.doc;
+  //     const linkedDoc = createLinkedDocFromSelectedBlocks(doc, selectedModels);
+  //     const linkedDocService = host.spec.getService('affine:embed-linked-doc');
+  //     linkedDocService.slots.linkedDocCreated.emit({ docId: linkedDoc.id });
+  //   },
+  // },
 ];

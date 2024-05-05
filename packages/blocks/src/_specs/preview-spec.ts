@@ -14,9 +14,11 @@ import { DividerBlockSchema } from '../divider-block/divider-model.js';
 import { EmbedFigmaBlockSpec } from '../embed-figma-block/embed-figma-spec.js';
 import { EmbedGithubBlockSpec } from '../embed-github-block/index.js';
 import { EmbedHtmlBlockSpec } from '../embed-html-block/embed-html-spec.js';
-import { EmbedLinkedDocBlockSpec } from '../embed-linked-doc-block/embed-linked-doc-spec.js';
+// NOTE: disabled for bundle
+// import { EmbedLinkedDocBlockSpec } from '../embed-linked-doc-block/embed-linked-doc-spec.js';
 import { EmbedLoomBlockSpec } from '../embed-loom-block/embed-loom-spec.js';
-import { EmbedSyncedDocBlockSpec } from '../embed-synced-doc-block/embed-synced-doc-spec.js';
+// NOTE: disabled for bundle
+// import { EmbedSyncedDocBlockSpec } from '../embed-synced-doc-block/embed-synced-doc-spec.js';
 import { EmbedYoutubeBlockSpec } from '../embed-youtube-block/embed-youtube-spec.js';
 import { ImageBlockSchema } from '../image-block/image-model.js';
 import { ImageService } from '../image-block/index.js';
@@ -123,8 +125,9 @@ const CommonFirstPartyBlockSpecs: BlockSpec[] = [
   EmbedYoutubeBlockSpec,
   EmbedLoomBlockSpec,
   EmbedHtmlBlockSpec,
-  EmbedSyncedDocBlockSpec,
-  EmbedLinkedDocBlockSpec,
+  // NOTE: disabled for bundle
+  // EmbedSyncedDocBlockSpec,
+  // EmbedLinkedDocBlockSpec,
 ];
 
 export const PreviewEditorBlockSpecs: BlockSpec[] = [

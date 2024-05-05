@@ -14,20 +14,24 @@ import {
   DatabaseKanbanViewIcon20,
   DatabaseTableViewIcon20,
   DeleteIcon,
-  DualLinkIcon,
+  // NOTE: disabled for bundle
+  // DualLinkIcon,
   DuplicateIcon,
   FrameIcon,
   ImageIcon20,
-  NewDocIcon,
+  // NOTE: disabled for bundle
+  // NewDocIcon,
   NowIcon,
   TodayIcon,
   TomorrowIcon,
   YesterdayIcon,
 } from '../../../_common/icons/index.js';
-import { REFERENCE_NODE } from '../../../_common/inline/presets/nodes/consts.js';
+// NOTE: disabled for bundle
+// import { REFERENCE_NODE } from '../../../_common/inline/presets/nodes/consts.js';
 import {
   buildPath,
-  createDefaultDoc,
+  // NOTE: disabled for bundle
+  // createDefaultDoc,
   getBlockComponentByPath,
   getImageFilesFromLocal,
   getInlineEditorByModel,
@@ -50,7 +54,8 @@ import type { ParagraphBlockModel } from '../../../paragraph-block/index.js';
 import { onModelTextUpdated } from '../../../root-block/utils/index.js';
 import type { SurfaceBlockModel } from '../../../surface-block/index.js';
 import { CanvasElementType } from '../../../surface-block/index.js';
-import type { AffineLinkedDocWidget } from '../linked-doc/index.js';
+// NOTE: disabled for bundle
+// import type { AffineLinkedDocWidget } from '../linked-doc/index.js';
 import {
   formatDate,
   insertContent,
@@ -170,61 +175,61 @@ export const menuGroups: SlashMenuOptions['menus'] = [
         },
       })),
   },
-
-  {
-    name: 'Docs',
-    items: [
-      {
-        name: 'New Doc',
-        icon: NewDocIcon,
-        action: ({ rootElement, model }) => {
-          const newDoc = createDefaultDoc(rootElement.doc.collection);
-          insertContent(rootElement.host, model, REFERENCE_NODE, {
-            reference: {
-              type: 'LinkedPage',
-              pageId: newDoc.id,
-            },
-          });
-        },
-      },
-      {
-        name: 'Link Doc',
-        alias: ['dual link'],
-        icon: DualLinkIcon,
-        showWhen: (_, rootElement) => {
-          const linkedDocWidgetEle =
-            rootElement.widgetElements['affine-linked-doc-widget'];
-          if (!linkedDocWidgetEle) return false;
-          if (!('showLinkedDoc' in linkedDocWidgetEle)) {
-            console.warn(
-              'You may not have correctly implemented the linkedDoc widget! "showLinkedDoc(model)" method not found on widget'
-            );
-            return false;
-          }
-          return true;
-        },
-        action: ({ model, rootElement }) => {
-          const triggerKey = '@';
-          insertContent(rootElement.host, model, triggerKey);
-          assertExists(model.doc.root);
-          const widgetEle =
-            rootElement.widgetElements['affine-linked-doc-widget'];
-          assertExists(widgetEle);
-          // We have checked the existence of showLinkedDoc method in the showWhen
-          const linkedDocWidget = widgetEle as AffineLinkedDocWidget;
-          // Wait for range to be updated
-          setTimeout(() => {
-            const inlineEditor = getInlineEditorByModel(
-              rootElement.host,
-              model
-            );
-            assertExists(inlineEditor);
-            linkedDocWidget.showLinkedDoc(inlineEditor, triggerKey);
-          });
-        },
-      },
-    ],
-  },
+  // NOTE: disabled for bundle
+  // {
+  //   name: 'Docs',
+  //   items: [
+  //     {
+  //       name: 'New Doc',
+  //       icon: NewDocIcon,
+  //       action: ({ rootElement, model }) => {
+  //         const newDoc = createDefaultDoc(rootElement.doc.collection);
+  //         insertContent(rootElement.host, model, REFERENCE_NODE, {
+  //           reference: {
+  //             type: 'LinkedPage',
+  //             pageId: newDoc.id,
+  //           },
+  //         });
+  //       },
+  //     },
+  //     {
+  //       name: 'Link Doc',
+  //       alias: ['dual link'],
+  //       icon: DualLinkIcon,
+  //       showWhen: (_, rootElement) => {
+  //         const linkedDocWidgetEle =
+  //           rootElement.widgetElements['affine-linked-doc-widget'];
+  //         if (!linkedDocWidgetEle) return false;
+  //         if (!('showLinkedDoc' in linkedDocWidgetEle)) {
+  //           console.warn(
+  //             'You may not have correctly implemented the linkedDoc widget! "showLinkedDoc(model)" method not found on widget'
+  //           );
+  //           return false;
+  //         }
+  //         return true;
+  //       },
+  //       action: ({ model, rootElement }) => {
+  //         const triggerKey = '@';
+  //         insertContent(rootElement.host, model, triggerKey);
+  //         assertExists(model.doc.root);
+  //         const widgetEle =
+  //           rootElement.widgetElements['affine-linked-doc-widget'];
+  //         assertExists(widgetEle);
+  //         // We have checked the existence of showLinkedDoc method in the showWhen
+  //         const linkedDocWidget = widgetEle as AffineLinkedDocWidget;
+  //         // Wait for range to be updated
+  //         setTimeout(() => {
+  //           const inlineEditor = getInlineEditorByModel(
+  //             rootElement.host,
+  //             model
+  //           );
+  //           assertExists(inlineEditor);
+  //           linkedDocWidget.showLinkedDoc(inlineEditor, triggerKey);
+  //         });
+  //       },
+  //     },
+  //   ],
+  // },
   {
     name: 'Content & Media',
     items: [

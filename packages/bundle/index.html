@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+  <head>
+    <style>
+      div#editor-container {
+        position: fixed;
+        top: 30px;
+        left: 360px;
+        width: 1000px;
+        height: 800px;
+      }
+      button#switch-editor-button {
+        position: fixed;
+        top: 30px;
+        left: 30px;
+        height: 30px;
+        width: 100px;
+      }
+      pre#document-snapshot {
+        top: 90px;
+        left: 30px;
+        width: 300px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="editor-container"></div>
+    <button id="switch-editor-button">Switch Editor</button>
+    <pre id="document-snapshot"></pre>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

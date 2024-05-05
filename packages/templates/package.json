@@ -1,0 +1,19 @@
+{
+  "name": "@blocksuite/templates",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "postinstall": "node ./build-edgeless.mjs && node ./build-stickers.mjs"
+  },
+  "exports": {
+    "./onboarding.zip": "./onboarding/onboarding.zip",
+    "./edgeless": "./edgeless-templates.gen.ts",
+    "./stickers": "./stickers-templates.gen.ts",
+    "./build-edgeless": "./build-edgeless.mjs"
+  },
+  "devDependencies": {
+    "glob": "^10.3.12",
+    "jszip": "^3.10.1"
+  }
+}
