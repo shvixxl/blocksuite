@@ -8,3 +8,5 @@ packages:
   - 'packages/docs'
   - 'packages/playground'
   - 'packages/presets'
+  - 'packages/bundle'
+  - 'packages/templates'

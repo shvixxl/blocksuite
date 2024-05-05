@@ -1,5 +1,6 @@
 import type { Chain, InitCommandCtx } from '@blocksuite/block-std';
-import { assertExists } from '@blocksuite/global/utils';
+// NOTE: disabled for bundle
+// import { assertExists } from '@blocksuite/global/utils';
 import { html, type TemplateResult } from 'lit';
 
 import { toast } from '../../../_common/components/index.js';
@@ -12,7 +13,8 @@ import {
   CodeIcon,
   CopyIcon,
   DatabaseTableViewIcon20,
-  FontLinkedDocIcon,
+  // NOTE: disabled for bundle
+  // FontLinkedDocIcon,
   Heading1Icon,
   Heading2Icon,
   Heading3Icon,
@@ -27,7 +29,8 @@ import {
   TextIcon,
   UnderlineIcon,
 } from '../../../_common/icons/index.js';
-import { convertSelectedBlocksToLinkedDoc } from '../../../_common/utils/render-linked-doc.js';
+// NOTE: disabled for bundle
+// import { convertSelectedBlocksToLinkedDoc } from '../../../_common/utils/render-linked-doc.js';
 import type { AffineFormatBarWidget } from './format-bar.js';
 
 export type DividerConfigItem = {
@@ -164,42 +167,43 @@ export function toolbarDefaultConfig(toolbar: AffineFormatBarWidget) {
         );
       },
     })
-    .addInlineAction({
-      id: 'convert-to-linked-doc',
-      name: 'Create Linked Doc',
-      icon: FontLinkedDocIcon,
-      isActive: () => false,
-      action: (chain, formatBar) => {
-        const [_, ctx] = chain
-          .getSelectedModels({
-            types: ['block'],
-            mode: 'highest',
-          })
-          .run();
-        const { selectedModels } = ctx;
-        assertExists(selectedModels);
-        if (!selectedModels.length) return;
+    // NOTE: disabled for bundle
+    // .addInlineAction({
+    //   id: 'convert-to-linked-doc',
+    //   name: 'Create Linked Doc',
+    //   icon: FontLinkedDocIcon,
+    //   isActive: () => false,
+    //   action: (chain, formatBar) => {
+    //     const [_, ctx] = chain
+    //       .getSelectedModels({
+    //         types: ['block'],
+    //         mode: 'highest',
+    //       })
+    //       .run();
+    //     const { selectedModels } = ctx;
+    //     assertExists(selectedModels);
+    //     if (!selectedModels.length) return;
 
-        const host = formatBar.host;
-        host.selection.clear();
+    //     const host = formatBar.host;
+    //     host.selection.clear();
 
-        const doc = host.doc;
-        const linkedDoc = convertSelectedBlocksToLinkedDoc(doc, selectedModels);
-        const linkedDocService = host.spec.getService(
-          'affine:embed-linked-doc'
-        );
-        linkedDocService.slots.linkedDocCreated.emit({ docId: linkedDoc.id });
-      },
-      showWhen: chain => {
-        const [_, ctx] = chain
-          .getSelectedModels({
-            types: ['block'],
-          })
-          .run();
-        const { selectedModels } = ctx;
-        return !!selectedModels && selectedModels.length > 0;
-      },
-    })
+    //     const doc = host.doc;
+    //     const linkedDoc = convertSelectedBlocksToLinkedDoc(doc, selectedModels);
+    //     const linkedDocService = host.spec.getService(
+    //       'affine:embed-linked-doc'
+    //     );
+    //     linkedDocService.slots.linkedDocCreated.emit({ docId: linkedDoc.id });
+    //   },
+    //   showWhen: chain => {
+    //     const [_, ctx] = chain
+    //       .getSelectedModels({
+    //         types: ['block'],
+    //       })
+    //       .run();
+    //     const { selectedModels } = ctx;
+    //     return !!selectedModels && selectedModels.length > 0;
+    //   },
+    // })
     .addBlockTypeSwitch({
       flavour: 'affine:paragraph',
       type: 'text',

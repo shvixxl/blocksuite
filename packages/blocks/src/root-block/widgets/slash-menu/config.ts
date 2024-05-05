@@ -18,18 +18,21 @@ import {
   FrameIcon,
   HeadingIcon,
   ImageIcon20,
-  LinkedDocIcon,
+  // NOTE: disabled for bundle
+  // LinkedDocIcon,
   LinkIcon,
-  NewDocIcon,
+  // NewDocIcon,
   NowIcon,
   PasteIcon,
   TodayIcon,
   TomorrowIcon,
   YesterdayIcon,
 } from '../../../_common/icons/index.js';
-import { REFERENCE_NODE } from '../../../_common/inline/presets/nodes/consts.js';
+// NOTE: disabled for bundle
+// import { REFERENCE_NODE } from '../../../_common/inline/presets/nodes/consts.js';
 import {
-  createDefaultDoc,
+  // NOTE: disabled for bundle
+  // createDefaultDoc,
   getBlockComponentByPath,
   getImageFilesFromLocal,
   getInlineEditorByModel,
@@ -53,7 +56,8 @@ import { onModelTextUpdated } from '../../../root-block/utils/index.js';
 import { CanvasElementType } from '../../../surface-block/index.js';
 import { getSurfaceBlock } from '../../../surface-ref-block/utils.js';
 import type { RootBlockComponent } from '../../types.js';
-import type { AffineLinkedDocWidget } from '../linked-doc/index.js';
+// NOTE: disabled for bundle
+// import type { AffineLinkedDocWidget } from '../linked-doc/index.js';
 import { type SlashMenuTooltip, slashMenuToolTips } from './tooltips.js';
 import {
   createDatabaseBlockInNextLine,
@@ -229,57 +233,58 @@ export const defaultSlashMenuConfig: SlashMenuConfig = {
       })),
 
     // ---------------------------------------------------------
-    { groupName: 'Page' },
-    {
-      name: 'New Doc',
-      description: 'Start a new document.',
-      icon: NewDocIcon,
-      tooltip: slashMenuToolTips['New Doc'],
-      action: ({ rootElement, model }) => {
-        const newDoc = createDefaultDoc(rootElement.doc.collection);
-        insertContent(rootElement.host, model, REFERENCE_NODE, {
-          reference: {
-            type: 'LinkedPage',
-            pageId: newDoc.id,
-          },
-        });
-      },
-    },
-    {
-      name: 'Linked Doc',
-      description: 'Link to another document.',
-      icon: LinkedDocIcon,
-      tooltip: slashMenuToolTips['Linked Doc'],
-      alias: ['dual link'],
-      showWhen: ({ rootElement }) => {
-        const linkedDocWidgetEle =
-          rootElement.widgetElements['affine-linked-doc-widget'];
-        if (!linkedDocWidgetEle) return false;
-        if (!('showLinkedDoc' in linkedDocWidgetEle)) {
-          console.warn(
-            'You may not have correctly implemented the linkedDoc widget! "showLinkedDoc(model)" method not found on widget'
-          );
-          return false;
-        }
-        return true;
-      },
-      action: ({ model, rootElement }) => {
-        const triggerKey = '@';
-        insertContent(rootElement.host, model, triggerKey);
-        assertExists(model.doc.root);
-        const widgetEle =
-          rootElement.widgetElements['affine-linked-doc-widget'];
-        assertExists(widgetEle);
-        // We have checked the existence of showLinkedDoc method in the showWhen
-        const linkedDocWidget = widgetEle as AffineLinkedDocWidget;
-        // Wait for range to be updated
-        setTimeout(() => {
-          const inlineEditor = getInlineEditorByModel(rootElement.host, model);
-          assertExists(inlineEditor);
-          linkedDocWidget.showLinkedDoc(inlineEditor, triggerKey);
-        });
-      },
-    },
+    // NOTE: disabled for bundle
+    // { groupName: 'Page' },
+    // {
+    //   name: 'New Doc',
+    //   description: 'Start a new document.',
+    //   icon: NewDocIcon,
+    //   tooltip: slashMenuToolTips['New Doc'],
+    //   action: ({ rootElement, model }) => {
+    //     const newDoc = createDefaultDoc(rootElement.doc.collection);
+    //     insertContent(rootElement.host, model, REFERENCE_NODE, {
+    //       reference: {
+    //         type: 'LinkedPage',
+    //         pageId: newDoc.id,
+    //       },
+    //     });
+    //   },
+    // },
+    // {
+    //   name: 'Linked Doc',
+    //   description: 'Link to another document.',
+    //   icon: LinkedDocIcon,
+    //   tooltip: slashMenuToolTips['Linked Doc'],
+    //   alias: ['dual link'],
+    //   showWhen: ({ rootElement }) => {
+    //     const linkedDocWidgetEle =
+    //       rootElement.widgetElements['affine-linked-doc-widget'];
+    //     if (!linkedDocWidgetEle) return false;
+    //     if (!('showLinkedDoc' in linkedDocWidgetEle)) {
+    //       console.warn(
+    //         'You may not have correctly implemented the linkedDoc widget! "showLinkedDoc(model)" method not found on widget'
+    //       );
+    //       return false;
+    //     }
+    //     return true;
+    //   },
+    //   action: ({ model, rootElement }) => {
+    //     const triggerKey = '@';
+    //     insertContent(rootElement.host, model, triggerKey);
+    //     assertExists(model.doc.root);
+    //     const widgetEle =
+    //       rootElement.widgetElements['affine-linked-doc-widget'];
+    //     assertExists(widgetEle);
+    //     // We have checked the existence of showLinkedDoc method in the showWhen
+    //     const linkedDocWidget = widgetEle as AffineLinkedDocWidget;
+    //     // Wait for range to be updated
+    //     setTimeout(() => {
+    //       const inlineEditor = getInlineEditorByModel(rootElement.host, model);
+    //       assertExists(inlineEditor);
+    //       linkedDocWidget.showLinkedDoc(inlineEditor, triggerKey);
+    //     });
+    //   },
+    // },
 
     // ---------------------------------------------------------
     { groupName: 'Content & Media' },

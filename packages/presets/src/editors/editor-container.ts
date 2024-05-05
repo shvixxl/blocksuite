@@ -1,8 +1,9 @@
 import './page-editor.js';
 import './edgeless-editor.js';
-import '../fragments/doc-title/doc-title.js';
-import '../fragments/doc-meta-tags/doc-meta-tags.js';
 
+// NOTE: disabled for bundle
+// import '../fragments/doc-title/doc-title.js';
+// import '../fragments/doc-meta-tags/doc-meta-tags.js';
 import { ShadowlessElement, WithDisposable } from '@blocksuite/block-std';
 import type {
   AbstractEditor,
@@ -244,9 +245,12 @@ export class AffineEditorContainer
       this.mode === 'page'
         ? html`
             <div class="affine-page-viewport">
-              <doc-title .doc=${this.doc}></doc-title>
-
-              <doc-meta-tags .doc=${this.doc}></doc-meta-tags>
+              ${
+                // NOTE: disabled for bundle
+                // <doc-title .doc=${this.doc}></doc-title>
+                // <doc-meta-tags .doc=${this.doc}></doc-meta-tags>
+                ''
+              }
 
               <page-editor
                 .doc=${this.doc}

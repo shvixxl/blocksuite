@@ -2,10 +2,11 @@ import { keys } from '../../../../../_common/utils/iterable.js';
 import type { Template, TemplateManager } from './template-type.js';
 
 export const templates = [
-  {
-    name: 'Paws and pals',
-    templates: () => import('./templates/stickers.js').then(val => val.default),
-  },
+  // NOTE: disabled for bundle
+  // {
+  //   name: 'Paws and pals',
+  //   templates: () => import('./templates/stickers.js').then(val => val.default),
+  // },
 ];
 
 function lcs(text1: string, text2: string) {
