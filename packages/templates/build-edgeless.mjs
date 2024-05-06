@@ -202,7 +202,10 @@ const buildScript = async templatesInGroup => {
   ]`;
   });
 
-  const code = `${importStatements}
+  const code = `/* eslint-disable */
+// @ts-nocheck
+
+${importStatements}
 
 const templates = {
   ${templatesDeclaration.join(',\n  ')}

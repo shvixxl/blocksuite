@@ -17,7 +17,9 @@
         "inline",
         "lit",
         "sync",
-        "examples"
+        "examples",
+        "bundle",
+        "templates"
       ]
     ]
   }

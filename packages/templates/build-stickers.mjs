@@ -122,8 +122,7 @@ function buildStickerTemplate(data) {
   };
 }
 
-const code = `
-/* eslint-disable */
+const code = `/* eslint-disable */
 // @ts-nocheck
 
 ${importStatements}
