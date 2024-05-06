@@ -201,6 +201,10 @@ export async function openFileOrFiles({
       }
       resolve(input.files[0]);
     });
+    // The `cancel` event fires when the use cancels the dialog.
+    input.addEventListener('cancel', () => {
+      resolve(null);
+    });
     // Show the picker.
     if ('showPicker' in HTMLInputElement.prototype) {
       input.showPicker();
