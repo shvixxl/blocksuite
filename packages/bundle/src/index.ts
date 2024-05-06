@@ -11,4 +11,5 @@ export {
   Job,
   mimeExtMap,
   Schema,
+  Text,
 } from '@blocksuite/store';
