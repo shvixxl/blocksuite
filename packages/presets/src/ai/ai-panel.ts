@@ -182,6 +182,7 @@ export function buildTextResponseConfig<
           name: 'Discard',
           icon: DiscardIcon,
           handler: () => {
+            reportResponse('result:discard');
             panel.discard();
           },
         },
@@ -282,6 +283,7 @@ export function buildErrorResponseConfig<
           icon: DiscardIcon,
           showWhen: () => !!panel.answer,
           handler: () => {
+            reportResponse('result:discard');
             panel.discard();
           },
         },
