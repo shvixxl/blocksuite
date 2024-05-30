@@ -582,6 +582,7 @@ test('duplicate code block', async ({ page }) => {
 
   const codeBlockController = getCodeBlock(page);
   await codeBlockController.codeBlock.hover();
+  const moreMenu = await codeBlockController.openMore();
 
   // change language
   await codeBlockController.clickLanguageButton();

@@ -304,7 +304,6 @@ export class ChatPanelInput extends WithDisposable(LitElement) {
             ? 'var(--affine-text-disable-color)'
             : 'var(--affine-primary-color)'};
         }
-
         .chat-panel-input {
           border: ${this.focused
             ? '1px solid var(--affine-primary-color)'

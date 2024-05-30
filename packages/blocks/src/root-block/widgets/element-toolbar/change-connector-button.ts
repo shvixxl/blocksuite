@@ -81,6 +81,88 @@ export function getMostCommonLineStyle(
   return max ? (max[0] as StrokeStyle) : null;
 }
 
+interface EndpointStyle {
+  value: PointStyle;
+  icon: TemplateResult<1>;
+}
+
+const STYLE_LIST = [
+  {
+    name: 'General',
+    value: false,
+    icon: GeneralStyleIcon,
+  },
+  {
+    name: 'Scribbled',
+    value: true,
+    icon: ScribbledStyleIcon,
+  },
+];
+
+const FRONT_ENDPOINT_STYLE_LIST: EndpointStyle[] = [
+  {
+    value: 'None',
+    icon: ConnectorEndpointNoneIcon,
+  },
+  {
+    value: 'Arrow',
+    icon: FrontEndpointArrowIcon,
+  },
+  {
+    value: 'Triangle',
+    icon: FrontEndpointTriangleIcon,
+  },
+  {
+    value: 'Circle',
+    icon: FrontEndpointCircleIcon,
+  },
+  {
+    value: 'Diamond',
+    icon: FrontEndpointDiamondIcon,
+  },
+];
+
+const REAR_ENDPOINT_STYLE_LIST: EndpointStyle[] = [
+  {
+    value: 'Diamond',
+    icon: RearEndpointDiamondIcon,
+  },
+  {
+    value: 'Circle',
+    icon: RearEndpointCircleIcon,
+  },
+  {
+    value: 'Triangle',
+    icon: RearEndpointTriangleIcon,
+  },
+  {
+    value: 'Arrow',
+    icon: RearEndpointArrowIcon,
+  },
+  {
+    value: 'None',
+    icon: ConnectorEndpointNoneIcon,
+  },
+];
+
+const SHAPE_LIST = [
+  {
+    name: 'Straight',
+    icon: StraightLineIcon,
+    value: ConnectorMode.Straight,
+  },
+  {
+    name: 'Curve',
+    icon: CurveLineIcon,
+    value: ConnectorMode.Curve,
+  },
+  {
+    name: 'Elbowed',
+    icon: ElbowedLineIcon,
+    value: ConnectorMode.Orthogonal,
+  },
+];
+
 function getMostCommonRough(elements: ConnectorElementModel[]): boolean {
   const { trueCount, falseCount } = elements.reduce(
     (counts, ele) => {

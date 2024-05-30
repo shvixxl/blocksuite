@@ -441,6 +441,106 @@ export class ConnectorElementModel extends SurfaceElementModel<ConnectorElementP
     const b = getBezierParameters(path);
     return getBezierNearestTime(b, point);
   }
+
+  /**
+   * Calculate the closest point on the curve via a point.
+   */
+  override getNearestPoint(point: IVec2) {
+    const { mode, absolutePath: path } = this;
+
+    if (mode === ConnectorMode.Straight) {
+      const first = path[0];
+      const last = path[path.length - 1];
+      return Vec.nearestPointOnLineSegment(first, last, point, true);
+    }
+
+    if (mode === ConnectorMode.Orthogonal) {
+      const points = path.map<IVec2>(p => [p[0], p[1]]);
+      return Polyline.nearestPoint(points, point);
+    }
+
+    const b = getBezierParameters(path);
+    const t = getBezierNearestTime(b, point);
+    const p = getBezierPoint(b, t);
+    if (p) return p;
+
+    const { x, y } = this;
+    return [x, y];
+  }
+
+  /**
+   * Calculating the computed point along a path via a offset distance.
+   *
+   * Returns a point relative to the viewport.
+   */
+  getPointByOffsetDistance(offsetDistance = 0.5, bounds?: Bound) {
+    const { mode, absolutePath: path } = this;
+
+    if (mode === ConnectorMode.Straight) {
+      const first = path[0];
+      const last = path[path.length - 1];
+      return Vec.lrp(first, last, offsetDistance);
+    }
+
+    let { x, y, w, h } = this;
+    if (bounds) {
+      x = bounds.x;
+      y = bounds.y;
+      w = bounds.w;
+      h = bounds.h;
+    }
+
+    if (mode === ConnectorMode.Orthogonal) {
+      const points = path.map<IVec2>(p => [p[0], p[1]]);
+      const point = Polyline.pointAt(points, offsetDistance);
+      if (point) return point;
+      return [x + w / 2, y + h / 2];
+    }
+
+    const b = getBezierParameters(path);
+    const point = getBezierPoint(b, offsetDistance);
+    if (point) return point;
+    return [x + w / 2, y + h / 2];
+  }
+
+  /**
+   * Calculating the computed distance along a path via a point.
+   *
+   * The point is relative to the viewport.
+   */
+  getOffsetDistanceByPoint(point: IVec2, bounds?: Bound) {
+    const { mode, absolutePath: path } = this;
+
+    let { x, y, w, h } = this;
+    if (bounds) {
+      x = bounds.x;
+      y = bounds.y;
+      w = bounds.w;
+      h = bounds.h;
+    }
+
+    point[0] = Vec.clamp(point[0], x, x + w);
+    point[1] = Vec.clamp(point[1], y, y + h);
+
+    if (mode === ConnectorMode.Straight) {
+      const s = path[0];
+      const e = path[path.length - 1];
+      const pl = Vec.dist(s, point);
+      const fl = Vec.dist(s, e);
+      return pl / fl;
+    }
+
+    if (mode === ConnectorMode.Orthogonal) {
+      const points = path.map<IVec2>(p => [p[0], p[1]]);
+      const p = Polyline.nearestPoint(points, point);
+      const pl = Polyline.lenAtPoint(points, p);
+      const fl = Polyline.len(points);
+      return pl / fl;
+    }
+
+    const b = getBezierParameters(path);
+    return getBezierNearestTime(b, point);
+  }
 }
 
 export class LocalConnectorElementModel extends SurfaceLocalModel {

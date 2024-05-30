@@ -587,7 +587,6 @@ export class EdgelessChangeEmbedCardButton extends WithDisposable(LitElement) {
             </edgeless-tool-icon-button>
           `
         : nothing,
-
       isEmbedSyncedDocBlock(model)
         ? html`
             <div class="change-embed-card-button doc-info" @click=${this._open}>
@@ -635,7 +634,6 @@ export class EdgelessChangeEmbedCardButton extends WithDisposable(LitElement) {
             </edgeless-tool-icon-button>
           `
         : nothing,
-
       this._canConvertToEmbedView || this._isEmbedView
         ? html`
             <div class="change-embed-card-view-style">
@@ -673,7 +671,6 @@ export class EdgelessChangeEmbedCardButton extends WithDisposable(LitElement) {
             </div>
           `
         : nothing,
-
       'style' in model && this._canShowCardStylePanel
         ? html`
             <edgeless-menu-button
@@ -698,7 +695,6 @@ export class EdgelessChangeEmbedCardButton extends WithDisposable(LitElement) {
             </edgeless-menu-button>
           `
         : nothing,
-
       html`
         <edgeless-tool-icon-button
           arai-label="Add caption"

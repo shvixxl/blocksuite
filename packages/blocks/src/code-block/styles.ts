@@ -5,6 +5,10 @@ export const codeBlockStyles = css`
     position: relative;
     z-index: 1;
   }
+  .affine-code-block-wrapper {
+    position: relative;
+    margin: 24px 0px;
+  }
 
   .affine-code-block-container {
     font-size: var(--affine-font-sm);

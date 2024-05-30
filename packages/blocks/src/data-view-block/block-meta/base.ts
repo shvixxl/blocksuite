@@ -19,7 +19,7 @@ type PropertyMeta<
   updated: (block: T, callback: () => void) => Disposable;
 };
 export type BlockMeta<T extends BlockModel = BlockModel> = {
-  selector: (block: Block) => boolean;
+  selector: BlockSelector;
   properties: PropertyMeta<T>[];
 };
 export const createBlockMeta = <T extends BlockModel>(
