@@ -47,6 +47,9 @@
       "path": "./packages/framework/inline"
     },
     {
+      "path": "./packages/bundle"
+    },
+    {
       "path": "./tests"
     },
     {

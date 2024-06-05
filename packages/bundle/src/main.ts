@@ -9,6 +9,8 @@ const doc = collection.createDoc();
 doc.load(() => {
   const rootId = doc.addBlock('affine:page', {});
   doc.addBlock('affine:surface', {}, rootId);
+  const noteId = doc.addBlock('affine:note', {}, rootId);
+  doc.addBlock('affine:paragraph', {}, noteId);
 });
 doc.resetHistory();
 

@@ -33,10 +33,16 @@ export class EdgelessEditor extends WithDisposable(ShadowlessElement) {
     .affine-edgeless-viewport {
       display: block;
       height: 100%;
+      /*
+      NOTE: disabled for bundle
       position: relative;
+      */
       overflow: clip;
       container-name: viewport;
+      /*
+      NOTE: disabled for bundle
       container-type: inline-size;
+      */
     }
   `;
 

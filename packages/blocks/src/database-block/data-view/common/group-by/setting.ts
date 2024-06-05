@@ -30,7 +30,7 @@ export class GroupSetting extends WithDisposable(ShadowlessElement) {
       gap: 4px;
       ${unsafeCSS(dataViewCssVariable())};
     }
-    .group-item {
+    .affine-group-item {
       display: flex;
       padding: 4px 12px;
       position: relative;
@@ -129,7 +129,7 @@ export class GroupSetting extends WithDisposable(ShadowlessElement) {
               readonly: true,
             };
             const config = group.helper.groupConfig();
-            return html` <div class="dv-hover dv-round-4 group-item">
+            return html` <div class="dv-hover dv-round-4 affine-group-item">
               <div class="group-item-drag-bar"></div>
               <div style="padding: 0 4px;position:relative;">
                 ${renderUniLit(config?.view, props)}

@@ -80,11 +80,14 @@ export class PageRootBlockComponent extends BlockElement<
       cursor: default;
 
       /* Leave a place for drag-handle */
-      /* Do not use prettier format this style, or it will be broken */
-      /* prettier-ignore */
-      padding-left: var(--affine-editor-side-padding, ${DOC_BLOCK_CHILD_PADDING}px);
-      /* prettier-ignore */
-      padding-right: var(--affine-editor-side-padding, ${DOC_BLOCK_CHILD_PADDING}px);
+      padding-left: max(
+        var(--affine-editor-side-padding, ${DOC_BLOCK_CHILD_PADDING}px),
+        ${DOC_BLOCK_CHILD_PADDING}px
+      );
+      padding-right: max(
+        var(--affine-editor-side-padding, ${DOC_BLOCK_CHILD_PADDING}px),
+        ${DOC_BLOCK_CHILD_PADDING}px
+      );
     }
 
     /* Extra small devices (phones, 640px and down) */

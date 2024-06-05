@@ -31,12 +31,18 @@ export class PageEditor extends WithDisposable(ShadowlessElement) {
     }
 
     .affine-page-viewport {
+      /*
+      NOTE: disabled for bundle
       position: relative;
+      */
       height: 100%;
       overflow-x: hidden;
       overflow-y: auto;
       container-name: viewport;
+      /*
+      NOTE: disabled for bundle
       container-type: inline-size;
+      */
     }
 
     .page-editor-container {

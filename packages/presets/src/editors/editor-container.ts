@@ -48,14 +48,20 @@ export class AffineEditorContainer
 {
   static override styles = css`
     .affine-page-viewport {
+      /*
+      NOTE: disabled for bundle
       position: relative;
+      */
       display: flex;
       flex-direction: column;
       height: 100%;
       overflow-x: hidden;
       overflow-y: auto;
       container-name: viewport;
+      /*
+      NOTE: disabled for bundle
       container-type: inline-size;
+      */
       background: var(--affine-background-primary-color);
       font-family: var(--affine-font-family);
     }

@@ -1,7 +1,7 @@
 import { keys } from '../../../../../_common/utils/iterable.js';
 import type { Template, TemplateManager } from './template-type.js';
 
-export const templates = [
+export const templates: { name: string; templates: () => Promise<object> }[] = [
   // NOTE: disabled for bundle
   // {
   //   name: 'Paws and pals',
