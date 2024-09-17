@@ -3,9 +3,10 @@ import { customElement } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
+import type { SelectTag } from '../../../utils/tags/multi-tag-select.js';
+
 import { popMenu } from '../../../../../_common/components/index.js';
 import { selectOptionColors } from '../../../utils/tags/colors.js';
-import type { SelectTag } from '../../../utils/tags/multi-tag-select.js';
 import { BaseGroup } from './base.js';
 
 @customElement('data-view-group-title-select-view')
@@ -15,49 +16,6 @@ export class SelectGroupView extends BaseGroup<
   },
   string
 > {
-  static override styles = css`
-    data-view-group-title-select-view {
-      overflow: hidden;
-    }
-    .data-view-group-title-select-view {
-      width: 100%;
-      cursor: pointer;
-    }
-
-    .data-view-group-title-select-view.readonly {
-      cursor: inherit;
-    }
-
-    .tag {
-      padding: 0 8px;
-      border-radius: 4px;
-      font-size: var(--data-view-cell-text-size);
-      line-height: var(--data-view-cell-text-line-height);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-  `;
-
-  get tag() {
-    return this.data.options.find(v => v.id === this.value);
-  }
-
-  updateTag(tag: Partial<SelectTag>) {
-    this.updateData?.({
-      ...this.data,
-      options: this.data.options.map(v => {
-        if (v.id === this.value) {
-          return {
-            ...v,
-            ...tag,
-          };
-        }
-        return v;
-      }),
-    });
-  }
-
   private _click = () => {
     if (this.readonly) {
       return;
@@ -91,6 +49,30 @@ export class SelectGroupView extends BaseGroup<
     });
   };
 
+  static override styles = css`
+    data-view-group-title-select-view {
+      overflow: hidden;
+    }
+    .data-view-group-title-select-view {
+      width: 100%;
+      cursor: pointer;
+    }
+
+    .data-view-group-title-select-view.readonly {
+      cursor: inherit;
+    }
+
+    .tag {
+      padding: 0 8px;
+      border-radius: 4px;
+      font-size: var(--data-view-cell-text-size);
+      line-height: var(--data-view-cell-text-line-height);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  `;
+
   protected override render(): unknown {
     const tag = this.tag;
     if (!tag) {
@@ -110,5 +92,24 @@ export class SelectGroupView extends BaseGroup<
     return html` <div @click="${this._click}" class="${classList}">
       <div class="tag" style="${style}">${tag.value}</div>
     </div>`;
+  }
+
+  updateTag(tag: Partial<SelectTag>) {
+    this.updateData?.({
+      ...this.data,
+      options: this.data.options.map(v => {
+        if (v.id === this.value) {
+          return {
+            ...v,
+            ...tag,
+          };
+        }
+        return v;
+      }),
+    });
+  }
+
+  get tag() {
+    return this.data.options.find(v => v.id === this.value);
   }
 }

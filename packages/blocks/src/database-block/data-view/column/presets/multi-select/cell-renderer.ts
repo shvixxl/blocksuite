@@ -1,17 +1,17 @@
-import '../../../utils/tags/multi-tag-select.js';
-import '../../../utils/tags/multi-tag-view.js';
-
 import { customElement } from 'lit/decorators.js';
 import { html } from 'lit/static-html.js';
 
+import type { SelectColumnData } from '../../types.js';
+
+import '../../../utils/tags/multi-tag-select.js';
 import {
-  popTagSelect,
   type SelectTag,
+  popTagSelect,
 } from '../../../utils/tags/multi-tag-select.js';
+import '../../../utils/tags/multi-tag-view.js';
 import { createIcon } from '../../../utils/uni-icon.js';
 import { BaseCellRenderer } from '../../base-cell.js';
 import { createFromBaseCellRenderer } from '../../renderer.js';
-import type { SelectColumnData } from '../../types.js';
 import { multiSelectColumnModelConfig } from './define.js';
 
 @customElement('affine-database-multi-select-cell')
@@ -22,8 +22,8 @@ export class MultiSelectCell extends BaseCellRenderer<
   override render() {
     return html`
       <affine-multi-tag-view
-        .value="${this.value ?? []}"
-        .options="${this.column.data.options}"
+        .value="${Array.isArray(this.value) ? this.value : []}"
+        .options="${this.column.data$.value.options}"
       ></affine-multi-tag-view>
     `;
   }
@@ -34,20 +34,12 @@ export class MultiSelectCellEditing extends BaseCellRenderer<
   string[],
   SelectColumnData
 > {
-  get _options(): SelectTag[] {
-    return this.column.data.options;
-  }
-
-  get _value() {
-    return this.value ?? [];
-  }
+  _editComplete = () => {
+    this.selectCurrentCell(false);
+  };
 
   _onChange = (ids: string[]) => {
     this.onChange(ids);
-  };
-
-  _editComplete = () => {
-    this.selectCurrentCell(false);
   };
 
   _onOptionsChange = (options: SelectTag[]) => {
@@ -58,10 +50,6 @@ export class MultiSelectCellEditing extends BaseCellRenderer<
       };
     });
   };
-
-  override firstUpdated() {
-    this.popTagSelect();
-  }
 
   private popTagSelect = () => {
     this._disposables.add({
@@ -78,6 +66,18 @@ export class MultiSelectCellEditing extends BaseCellRenderer<
       ),
     });
   };
+
+  get _options(): SelectTag[] {
+    return this.column.data$.value.options;
+  }
+
+  get _value() {
+    return this.value ?? [];
+  }
+
+  override firstUpdated() {
+    this.popTagSelect();
+  }
 
   override render() {
     return html`

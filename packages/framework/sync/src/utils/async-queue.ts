@@ -2,14 +2,19 @@ export class AsyncQueue<T> {
   private _queue: T[];
 
   private _resolveUpdate: (() => void) | null = null;
+
   private _waitForUpdate: Promise<void> | null = null;
 
   constructor(init: T[] = []) {
     this._queue = init;
   }
 
-  get length() {
-    return this._queue.length;
+  clear() {
+    this._queue = [];
+  }
+
+  find(predicate: (update: T) => boolean) {
+    return this._queue.find(predicate);
   }
 
   async next(
@@ -59,12 +64,8 @@ export class AsyncQueue<T> {
     }
   }
 
-  find(predicate: (update: T) => boolean) {
-    return this._queue.find(predicate);
-  }
-
-  clear() {
-    this._queue = [];
+  get length() {
+    return this._queue.length;
   }
 }
 
@@ -73,7 +74,7 @@ export class PriorityAsyncQueue<
 > extends AsyncQueue<T> {
   constructor(
     init: T[] = [],
-    public readonly priorityTarget: SharedPriorityTarget = new SharedPriorityTarget()
+    readonly priorityTarget: SharedPriorityTarget = new SharedPriorityTarget()
   ) {
     super(init);
   }
@@ -97,5 +98,5 @@ export class PriorityAsyncQueue<
  * Shared priority target can be shared by multiple queues.
  */
 export class SharedPriorityTarget {
-  public priorityRule: ((id: string) => boolean) | null = null;
+  priorityRule: ((id: string) => boolean) | null = null;
 }

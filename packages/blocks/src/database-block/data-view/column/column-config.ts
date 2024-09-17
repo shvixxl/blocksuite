@@ -1,4 +1,4 @@
-import { type Disposable } from '@blocksuite/global/utils';
+import type { Disposable } from '@blocksuite/global/utils';
 
 import type { TType } from '../logical/typesystem.js';
 import type { StatCalcOpType } from '../view/presets/table/types.js';
@@ -6,7 +6,8 @@ import type {
   GetCellDataFromConfig,
   GetColumnDataFromConfig,
 } from './manager.js';
-import { createRendererConfig, type Renderer } from './renderer.js';
+
+import { type Renderer, createRendererConfig } from './renderer.js';
 
 type JSON =
   | null
@@ -26,6 +27,7 @@ type ColumnOps<
   defaultData: () => Data;
   type: (data: Data) => TType;
   formatValue?: (value: unknown, colData: Data) => Value;
+  isEmpty: (value?: Value) => boolean;
   cellToString: (data: Value, colData: Data) => string;
   cellFromString: (
     data: string,
@@ -47,11 +49,6 @@ export class ColumnConfig<
 > {
   convertMap = new Map();
 
-  constructor(
-    public readonly type: Type,
-    public ops: ColumnOps<T, CellData>
-  ) {}
-
   create = (
     name: string,
     data?: T
@@ -69,8 +66,29 @@ export class ColumnConfig<
     };
   };
 
-  defaultData() {
-    return this.ops.defaultData();
+  registerConvert = <ToCellName extends keyof ColumnConfigMap>(
+    to: ToCellName,
+    convert: (
+      column: GetColumnDataFromConfig<ColumnConfig<Type, T, CellData>>,
+      cells: (
+        | GetCellDataFromConfig<ColumnConfig<Type, T, CellData>>
+        | undefined
+      )[]
+    ) => {
+      column: GetColumnDataFromConfig<ColumnConfigMap[ToCellName]>;
+      cells: (GetCellDataFromConfig<ColumnConfigMap[ToCellName]> | undefined)[];
+    }
+  ) => {
+    this.convertMap.set(to, convert);
+  };
+
+  constructor(
+    readonly type: Type,
+    public ops: ColumnOps<T, CellData>
+  ) {}
+
+  convertCell(to: string, column: Record<string, unknown>, cells: unknown[]) {
+    return this.convertMap.get(to)?.(column, cells);
   }
 
   createWithId(
@@ -95,43 +113,27 @@ export class ColumnConfig<
     return this.ops.type(data);
   }
 
-  toString(cellData: CellData, colData: T): string {
-    return this.ops.cellToString(cellData, colData);
-  }
-
-  toJson(cellData: CellData, colData: T): JSON {
-    return this.ops.cellToJson(cellData, colData);
+  defaultData() {
+    return this.ops.defaultData();
   }
 
   formatValue(cellData: CellData, colData: T): CellData | undefined {
     return cellData === undefined
       ? undefined
-      : this.ops.formatValue?.(cellData, colData) ?? cellData;
+      : (this.ops.formatValue?.(cellData, colData) ?? cellData);
   }
 
   fromString(cellData: string, colData: T) {
     return this.ops.cellFromString(cellData, colData);
   }
 
-  convertCell(to: string, column: Record<string, unknown>, cells: unknown[]) {
-    return this.convertMap.get(to)?.(column, cells);
+  toJson(cellData: CellData, colData: T): JSON {
+    return this.ops.cellToJson(cellData, colData);
   }
 
-  registerConvert = <ToCellName extends keyof ColumnConfigMap>(
-    to: ToCellName,
-    convert: (
-      column: GetColumnDataFromConfig<ColumnConfig<Type, T, CellData>>,
-      cells: (
-        | GetCellDataFromConfig<ColumnConfig<Type, T, CellData>>
-        | undefined
-      )[]
-    ) => {
-      column: GetColumnDataFromConfig<ColumnConfigMap[ToCellName]>;
-      cells: (GetCellDataFromConfig<ColumnConfigMap[ToCellName]> | undefined)[];
-    }
-  ) => {
-    this.convertMap.set(to, convert);
-  };
+  toString(cellData: CellData, colData: T): string {
+    return this.ops.cellToString(cellData, colData);
+  }
 
   get name() {
     return this.ops.name;

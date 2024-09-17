@@ -1,34 +1,27 @@
-import '../messages/slides-renderer.js';
-import './ai-loading.js';
-import '../messages/text.js';
-import './actions/text.js';
-import './actions/action-wrapper.js';
-import './actions/make-real.js';
-import './actions/slides.js';
-import './actions/mindmap.js';
-import './actions/chat-text.js';
-import './actions/copy-more.js';
-import './actions/image-to-text.js';
-import './actions/image.js';
-import './chat-cards.js';
-
 import type {
   BaseSelection,
   BlockSelection,
   TextSelection,
 } from '@blocksuite/block-std';
-import { type EditorHost } from '@blocksuite/block-std';
-import { ShadowlessElement, WithDisposable } from '@blocksuite/block-std';
+import type { EditorHost } from '@blocksuite/block-std';
 import type { ImageSelection } from '@blocksuite/blocks';
+
+import { ShadowlessElement, WithDisposable } from '@blocksuite/block-std';
 import {
-  isInsidePageEditor,
   PaymentRequiredError,
   UnauthorizedError,
+  isInsidePageEditor,
 } from '@blocksuite/blocks';
-import { css, html, nothing, type PropertyValues } from 'lit';
+import { type PropertyValues, css, html, nothing } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { styleMap } from 'lit/directives/style-map.js';
+
+import type {
+  ChatContextValue,
+  ChatItem,
+  ChatMessage,
+} from './chat-context.js';
 
 import {
   AffineAvatarIcon,
@@ -39,21 +32,31 @@ import {
   GeneralErrorRenderer,
   PaymentRequiredErrorRenderer,
 } from '../messages/error.js';
+import '../messages/slides-renderer.js';
+import '../messages/text.js';
 import { AIProvider } from '../provider.js';
 import { insertBelow } from '../utils/editor-actions.js';
+import './actions/action-wrapper.js';
 import {
   EdgelessEditorActions,
   PageEditorActions,
 } from './actions/actions-handle.js';
-import {
-  type ChatContextValue,
-  type ChatItem,
-  type ChatMessage,
-} from './chat-context.js';
+import './actions/chat-text.js';
+import './actions/copy-more.js';
+import './actions/image.js';
+import './actions/image-to-text.js';
+import './actions/make-real.js';
+import './actions/mindmap.js';
+import './actions/slides.js';
+import './actions/text.js';
+import './ai-loading.js';
+import './chat-cards.js';
 import { HISTORY_IMAGE_ACTIONS } from './const.js';
 
 @customElement('chat-panel-messages')
 export class ChatPanelMessages extends WithDisposable(ShadowlessElement) {
+  private _selectionValue: BaseSelection[] = [];
+
   static override styles = css`
     chat-panel-messages {
       position: relative;
@@ -140,39 +143,19 @@ export class ChatPanelMessages extends WithDisposable(ShadowlessElement) {
     }
   `;
 
-  @state()
-  accessor showDownIndicator = false;
-
-  @state()
-  accessor avatarUrl = '';
-
-  @property({ attribute: false })
-  accessor host!: EditorHost;
-
-  @property({ attribute: false })
-  accessor isLoading!: boolean;
-
-  @property({ attribute: false })
-  accessor chatContextValue!: ChatContextValue;
-
-  @property({ attribute: false })
-  accessor updateContext!: (context: Partial<ChatContextValue>) => void;
-
-  @query('.chat-panel-messages')
-  accessor messagesContainer!: HTMLDivElement;
-
-  private _selectionValue: BaseSelection[] = [];
-  private get _currentTextSelection(): TextSelection | undefined {
-    return this._selectionValue.find(v => v.type === 'text') as TextSelection;
-  }
   private get _currentBlockSelections(): BlockSelection[] | undefined {
     return this._selectionValue.filter(v => v.type === 'block');
   }
+
   private get _currentImageSelections(): ImageSelection[] | undefined {
     return this._selectionValue.filter(v => v.type === 'image');
   }
 
-  public override async connectedCallback() {
+  private get _currentTextSelection(): TextSelection | undefined {
+    return this._selectionValue.find(v => v.type === 'text') as TextSelection;
+  }
+
+  override async connectedCallback() {
     super.connectedCallback();
 
     const res = await AIProvider.userInfo;
@@ -192,122 +175,69 @@ export class ChatPanelMessages extends WithDisposable(ShadowlessElement) {
     );
   }
 
-  protected override updated(_changedProperties: PropertyValues) {
-    if (_changedProperties.has('host')) {
-      const { disposables } = this;
-
-      disposables.add(
-        this.host.selection.slots.changed.on(() => {
-          this._selectionValue = this.host.selection.value;
-          this.requestUpdate();
-        })
+  protected override render() {
+    const { items } = this.chatContextValue;
+    const { isLoading } = this;
+    const filteredItems = items.filter(item => {
+      return (
+        'role' in item ||
+        item.messages?.length === 3 ||
+        (HISTORY_IMAGE_ACTIONS.includes(item.action) &&
+          item.messages?.length === 2)
       );
-      disposables.add(
-        this.host.spec
-          .getService('affine:page')
-          .slots.editorModeSwitch.on(() => {
-            this.requestUpdate();
-          })
-      );
-    }
-  }
+    });
 
-  renderError() {
-    const { error } = this.chatContextValue;
+    return html`<style>
+        .chat-panel-messages-placeholder div {
+          color: ${isLoading
+            ? 'var(--affine-text-secondary-color)'
+            : 'var(--affine-text-primary-color)'};
+          font-size: ${isLoading ? 'var(--affine-font-sm)' : '18px'};
+          font-weight: 600;
+        }
+      </style>
 
-    if (error instanceof PaymentRequiredError) {
-      return PaymentRequiredErrorRenderer(this.host);
-    } else if (error instanceof UnauthorizedError) {
-      return GeneralErrorRenderer(
-        html`You need to login to AFFiNE Cloud to continue using AFFiNE AI.`,
-        html`<div
-          style=${styleMap({
-            padding: '4px 12px',
-            borderRadius: '8px',
-            border: '1px solid var(--affine-border-color)',
-            cursor: 'pointer',
-            backgroundColor: 'var(--affine-hover-color)',
-          })}
-          @click=${() =>
-            AIProvider.slots.requestLogin.emit({ host: this.host })}
-        >
-          Login
-        </div>`
-      );
-    } else {
-      return GeneralErrorRenderer();
-    }
-  }
-
-  renderItem(item: ChatItem, isLast: boolean) {
-    const { status, error } = this.chatContextValue;
-
-    if (isLast && status === 'loading') {
-      return this.renderLoading();
-    }
-
-    if (
-      isLast &&
-      status === 'error' &&
-      (error instanceof PaymentRequiredError ||
-        error instanceof UnauthorizedError)
-    ) {
-      return this.renderError();
-    }
-
-    if ('role' in item) {
-      const state = isLast
-        ? status !== 'loading' && status !== 'transmitting'
-          ? 'finished'
-          : 'generating'
-        : 'finished';
-      return html`<chat-text
-          .host=${this.host}
-          .attachments=${item.attachments}
-          .text=${item.content}
-          .state=${state}
-        ></chat-text>
-        ${isLast && status === 'error' ? this.renderError() : nothing}
-        ${this.renderEditorActions(item, isLast)}`;
-    } else {
-      switch (item.action) {
-        case 'Create a presentation':
-          return html`<action-slides
-            .host=${this.host}
-            .item=${item}
-          ></action-slides>`;
-        case 'Make it real':
-          return html`<action-make-real
-            .host=${this.host}
-            .item=${item}
-          ></action-make-real>`;
-        case 'Brainstorm mindmap':
-          return html`<action-mindmap
-            .host=${this.host}
-            .item=${item}
-          ></action-mindmap>`;
-        case 'Explain this image':
-        case 'Generate a caption':
-          return html`<action-image-to-text
-            .host=${this.host}
-            .item=${item}
-          ></action-image-to-text>`;
-        default:
-          if (HISTORY_IMAGE_ACTIONS.includes(item.action)) {
-            return html`<action-image
-              .host=${this.host}
-              .item=${item}
-            ></action-image>`;
-          }
-
-          return html`<action-text
-            .item=${item}
-            .host=${this.host}
-            .isCode=${item.action === 'Explain this code' ||
-            item.action === 'Check code error'}
-          ></action-text>`;
-      }
-    }
+      <div
+        class="chat-panel-messages"
+        @scroll=${(evt: Event) => {
+          const element = evt.target as HTMLDivElement;
+          this.showDownIndicator =
+            element.scrollHeight - element.scrollTop - element.clientHeight >
+            200;
+        }}
+      >
+        ${items.length === 0
+          ? html`<div class="chat-panel-messages-placeholder">
+                ${AffineIcon(
+                  isLoading
+                    ? 'var(--affine-icon-secondary)'
+                    : 'var(--affine-primary-color)'
+                )}
+                <div>
+                  ${this.isLoading
+                    ? 'AFFiNE AI is loading history...'
+                    : 'What can I help you with?'}
+                </div>
+              </div>
+              <chat-cards
+                .chatContextValue=${this.chatContextValue}
+                .updateContext=${this.updateContext}
+                .host=${this.host}
+                .selectionValue=${this._selectionValue}
+              ></chat-cards> `
+          : repeat(filteredItems, (item, index) => {
+              const isLast = index === filteredItems.length - 1;
+              return html`<div class="message">
+                ${this.renderAvatar(item)}
+                <div class="item-wrapper">${this.renderItem(item, isLast)}</div>
+              </div>`;
+            })}
+      </div>
+      ${this.showDownIndicator
+        ? html`<div class="down-indicator" @click=${() => this.scrollToDown()}>
+            ${DownArrowIcon}
+          </div>`
+        : nothing} `;
   }
 
   renderAvatar(item: ChatItem) {
@@ -323,14 +253,6 @@ export class ChatPanelMessages extends WithDisposable(ShadowlessElement) {
         : AffineAvatarIcon}
       ${isUser ? 'You' : 'AFFINE AI'}
     </div>`;
-  }
-
-  renderLoading() {
-    return html` <ai-loading></ai-loading>`;
-  }
-
-  scrollToDown() {
-    this.messagesContainer.scrollTo(0, this.messagesContainer.scrollHeight);
   }
 
   renderEditorActions(item: ChatMessage, isLast: boolean) {
@@ -454,69 +376,147 @@ export class ChatPanelMessages extends WithDisposable(ShadowlessElement) {
     `;
   }
 
-  protected override render() {
-    const { items } = this.chatContextValue;
-    const { isLoading } = this;
-    const filteredItems = items.filter(item => {
-      return (
-        'role' in item ||
-        item.messages?.length === 3 ||
-        (item.action === 'image' && item.messages?.length === 2)
+  renderError() {
+    const { error } = this.chatContextValue;
+
+    if (error instanceof PaymentRequiredError) {
+      return PaymentRequiredErrorRenderer(this.host);
+    } else if (error instanceof UnauthorizedError) {
+      return GeneralErrorRenderer(
+        html`You need to login to AFFiNE Cloud to continue using AFFiNE AI.`,
+        html`<div
+          style=${styleMap({
+            padding: '4px 12px',
+            borderRadius: '8px',
+            border: '1px solid var(--affine-border-color)',
+            cursor: 'pointer',
+            backgroundColor: 'var(--affine-hover-color)',
+          })}
+          @click=${() =>
+            AIProvider.slots.requestLogin.emit({ host: this.host })}
+        >
+          Login
+        </div>`
       );
-    });
-
-    return html`<style>
-        .chat-panel-messages-placeholder div {
-          color: ${isLoading
-            ? 'var(--affine-text-secondary-color)'
-            : 'var(--affine-text-primary-color)'};
-          font-size: ${isLoading ? 'var(--affine-font-sm)' : '18px'};
-          font-weight: 600;
-        }
-      </style>
-
-      <div
-        class="chat-panel-messages"
-        @scroll=${(evt: Event) => {
-          const element = evt.target as HTMLDivElement;
-          this.showDownIndicator =
-            element.scrollHeight - element.scrollTop - element.clientHeight >
-            200;
-        }}
-      >
-        ${items.length === 0
-          ? html`<div class="chat-panel-messages-placeholder">
-                ${AffineIcon(
-                  isLoading
-                    ? 'var(--affine-icon-secondary)'
-                    : 'var(--affine-primary-color)'
-                )}
-                <div>
-                  ${this.isLoading
-                    ? 'AFFiNE AI is loading history...'
-                    : 'What can I help you with?'}
-                </div>
-              </div>
-              <chat-cards
-                .chatContextValue=${this.chatContextValue}
-                .updateContext=${this.updateContext}
-                .host=${this.host}
-                .selectionValue=${this._selectionValue}
-              ></chat-cards> `
-          : repeat(filteredItems, (item, index) => {
-              const isLast = index === filteredItems.length - 1;
-              return html`<div class="message">
-                ${this.renderAvatar(item)}
-                <div class="item-wrapper">${this.renderItem(item, isLast)}</div>
-              </div>`;
-            })}
-      </div>
-      ${this.showDownIndicator
-        ? html`<div class="down-indicator" @click=${() => this.scrollToDown()}>
-            ${DownArrowIcon}
-          </div>`
-        : nothing} `;
+    } else {
+      return GeneralErrorRenderer();
+    }
   }
+
+  renderItem(item: ChatItem, isLast: boolean) {
+    const { status, error } = this.chatContextValue;
+
+    if (isLast && status === 'loading') {
+      return this.renderLoading();
+    }
+
+    if (
+      isLast &&
+      status === 'error' &&
+      (error instanceof PaymentRequiredError ||
+        error instanceof UnauthorizedError)
+    ) {
+      return this.renderError();
+    }
+
+    if ('role' in item) {
+      const state = isLast
+        ? status !== 'loading' && status !== 'transmitting'
+          ? 'finished'
+          : 'generating'
+        : 'finished';
+      return html`<chat-text
+          .host=${this.host}
+          .attachments=${item.attachments}
+          .text=${item.content}
+          .state=${state}
+        ></chat-text>
+        ${isLast && status === 'error' ? this.renderError() : nothing}
+        ${this.renderEditorActions(item, isLast)}`;
+    } else {
+      switch (item.action) {
+        case 'Create a presentation':
+          return html`<action-slides
+            .host=${this.host}
+            .item=${item}
+          ></action-slides>`;
+        case 'Make it real':
+          return html`<action-make-real
+            .host=${this.host}
+            .item=${item}
+          ></action-make-real>`;
+        case 'Brainstorm mindmap':
+          return html`<action-mindmap
+            .host=${this.host}
+            .item=${item}
+          ></action-mindmap>`;
+        case 'Explain this image':
+        case 'Generate a caption':
+          return html`<action-image-to-text
+            .host=${this.host}
+            .item=${item}
+          ></action-image-to-text>`;
+        default:
+          if (HISTORY_IMAGE_ACTIONS.includes(item.action)) {
+            return html`<action-image
+              .host=${this.host}
+              .item=${item}
+            ></action-image>`;
+          }
+
+          return html`<action-text
+            .item=${item}
+            .host=${this.host}
+            .isCode=${item.action === 'Explain this code' ||
+            item.action === 'Check code error'}
+          ></action-text>`;
+      }
+    }
+  }
+
+  renderLoading() {
+    return html` <ai-loading></ai-loading>`;
+  }
+
+  scrollToDown() {
+    this.messagesContainer.scrollTo(0, this.messagesContainer.scrollHeight);
+  }
+
+  protected override updated(_changedProperties: PropertyValues) {
+    if (_changedProperties.has('host')) {
+      const { disposables } = this;
+
+      disposables.add(
+        this.host.selection.slots.changed.on(() => {
+          this._selectionValue = this.host.selection.value;
+          this.requestUpdate();
+        })
+      );
+      const { docModeService } = this.host.spec.getService('affine:page');
+      disposables.add(docModeService.onModeChange(() => this.requestUpdate()));
+    }
+  }
+
+  @state()
+  accessor avatarUrl = '';
+
+  @property({ attribute: false })
+  accessor chatContextValue!: ChatContextValue;
+
+  @property({ attribute: false })
+  accessor host!: EditorHost;
+
+  @property({ attribute: false })
+  accessor isLoading!: boolean;
+
+  @query('.chat-panel-messages')
+  accessor messagesContainer!: HTMLDivElement;
+
+  @state()
+  accessor showDownIndicator = false;
+
+  @property({ attribute: false })
+  accessor updateContext!: (context: Partial<ChatContextValue>) => void;
 }
 
 declare global {

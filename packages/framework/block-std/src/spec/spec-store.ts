@@ -1,15 +1,16 @@
 import { DisposableGroup, Slot } from '@blocksuite/global/utils';
 
-import { BlockService } from '../service/index.js';
 import type { BlockSpec } from './index.js';
+
+import { BlockService } from '../service/index.js';
 import { getSlots } from './slots.js';
 
 export class SpecStore {
-  private _specs: Map<string, BlockSpec> = new Map();
-  private _services: Map<string, BlockService> = new Map();
   private _disposables = new DisposableGroup();
 
-  constructor(public std: BlockSuite.Std) {}
+  private _services = new Map<string, BlockService>();
+
+  private _specs = new Map<string, BlockSpec>();
 
   readonly slots = {
     beforeApply: new Slot(),
@@ -20,55 +21,14 @@ export class SpecStore {
     afterUnmount: new Slot(),
   };
 
-  mount() {
-    this.slots.beforeMount.emit();
+  constructor(public std: BlockSuite.Std) {}
 
-    if (this._disposables.disposed) {
-      this._disposables = new DisposableGroup();
-    }
-
-    this.slots.afterMount.emit();
-  }
-
-  unmount() {
-    this.slots.beforeUnmount.emit();
-
-    this._services.forEach(service => {
-      service.dispose();
-      service.unmounted();
+  private _buildSpecMap(specs: Array<BlockSpec>) {
+    const specMap = new Map<string, BlockSpec>();
+    specs.forEach(spec => {
+      specMap.set(spec.schema.model.flavour, spec);
     });
-    this._services.clear();
-    this._disposables.dispose();
-
-    this.slots.afterUnmount.emit();
-  }
-
-  applySpecs(specs: BlockSpec[]) {
-    this.slots.beforeApply.emit();
-
-    const oldSpecs = this._specs;
-    const newSpecs = this._buildSpecMap(specs);
-    this._diffServices(oldSpecs, newSpecs);
-    this._specs = newSpecs;
-
-    this.slots.afterApply.emit();
-  }
-
-  getView(flavour: string) {
-    const spec = this._specs.get(flavour);
-    if (!spec) {
-      return null;
-    }
-
-    return spec.view;
-  }
-
-  getService<Key extends BlockSuite.ServiceKeys>(
-    flavour: Key
-  ): BlockSuite.BlockServices[Key];
-  getService<Service extends BlockService>(flavour: string): Service;
-  getService(flavour: string): BlockService {
-    return this._services.get(flavour) as never;
+    return specMap;
   }
 
   private _diffServices(
@@ -110,19 +70,79 @@ export class SpecStore {
     });
   }
 
-  private _buildSpecMap(specs: Array<BlockSpec>) {
-    const specMap = new Map<string, BlockSpec>();
-    specs.forEach(spec => {
-      specMap.set(spec.schema.model.flavour, spec);
+  applySpecs(specs: BlockSpec[]) {
+    this.slots.beforeApply.emit();
+
+    const oldSpecs = this._specs;
+    const newSpecs = this._buildSpecMap(specs);
+    this._diffServices(oldSpecs, newSpecs);
+    this._specs = newSpecs;
+
+    this.slots.afterApply.emit();
+  }
+
+  getConfig<Key extends BlockSuite.ConfigKeys>(
+    flavour: Key
+  ): BlockSuite.BlockConfigs[Key] | null;
+
+  getConfig(flavour: string) {
+    const spec = this._specs.get(flavour);
+    if (!spec) {
+      return null;
+    }
+
+    return spec.config;
+  }
+
+  getService<Key extends BlockSuite.ServiceKeys>(
+    flavour: Key
+  ): BlockSuite.BlockServices[Key];
+
+  getService<Service extends BlockService>(flavour: string): Service;
+
+  getService(flavour: string): BlockService {
+    return this._services.get(flavour) as never;
+  }
+
+  getView(flavour: string) {
+    const spec = this._specs.get(flavour);
+    if (!spec) {
+      return null;
+    }
+
+    return spec.view;
+  }
+
+  mount() {
+    this.slots.beforeMount.emit();
+
+    if (this._disposables.disposed) {
+      this._disposables = new DisposableGroup();
+    }
+
+    this.slots.afterMount.emit();
+  }
+
+  unmount() {
+    this.slots.beforeUnmount.emit();
+
+    this._services.forEach(service => {
+      service.dispose();
+      service.unmounted();
     });
-    return specMap;
+    this._services.clear();
+    this._disposables.dispose();
+
+    this.slots.afterUnmount.emit();
   }
 }
 
 declare global {
   namespace BlockSuite {
     interface BlockServices {}
+    interface BlockConfigs {}
 
     type ServiceKeys = string & keyof BlockServices;
+    type ConfigKeys = string & keyof BlockConfigs;
   }
 }

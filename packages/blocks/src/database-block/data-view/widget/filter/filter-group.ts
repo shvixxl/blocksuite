@@ -1,22 +1,18 @@
-import './condition.js';
+import type { TemplateResult } from 'lit';
 
 import { ShadowlessElement, WithDisposable } from '@blocksuite/block-std';
-import type { ReferenceElement } from '@floating-ui/dom';
-import type { TemplateResult } from 'lit';
 import { css, html, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { repeat } from 'lit/directives/repeat.js';
 
-import {
-  eventToVRect,
-  popFilterableSimpleMenu,
-} from '../../../../_common/components/index.js';
+import type { Filter, FilterGroup, Variable } from '../../common/ast.js';
+
+import { popFilterableSimpleMenu } from '../../../../_common/components/index.js';
 import {
   ArrowDownSmallIcon,
   DuplicateIcon,
 } from '../../../../_common/icons/index.js';
-import type { Filter, FilterGroup, Variable } from '../../common/ast.js';
 import { firstFilter } from '../../common/ast.js';
 import {
   ConvertIcon,
@@ -24,10 +20,65 @@ import {
   MoreHorizontalIcon,
   PlusIcon,
 } from '../../common/icons/index.js';
+import './condition.js';
 import { popAddNewFilter } from './condition.js';
 
 @customElement('filter-group-view')
 export class FilterGroupView extends WithDisposable(ShadowlessElement) {
+  private _addNew = (e: MouseEvent) => {
+    if (this.isMaxDepth) {
+      this.setData({
+        ...this.data,
+        conditions: [...this.data.conditions, firstFilter(this.vars)],
+      });
+      return;
+    }
+    popAddNewFilter(e.target as HTMLElement, {
+      value: this.data,
+      onChange: this.setData,
+      vars: this.vars,
+    });
+  };
+
+  private _selectOp = (event: MouseEvent) => {
+    popFilterableSimpleMenu(event.target as HTMLElement, [
+      {
+        type: 'action',
+        name: 'And',
+        select: () => {
+          this.setData({
+            ...this.data,
+            op: 'and',
+          });
+        },
+      },
+      {
+        type: 'action',
+        name: 'Or',
+        select: () => {
+          this.setData({
+            ...this.data,
+            op: 'or',
+          });
+        },
+      },
+    ]);
+  };
+
+  private _setFilter = (index: number, filter: Filter) => {
+    this.setData({
+      ...this.data,
+      conditions: this.data.conditions.map((v, i) =>
+        index === i ? filter : v
+      ),
+    });
+  };
+
+  private opMap = {
+    and: 'And',
+    or: 'Or',
+  };
+
   static override styles = css`
     filter-group-view {
       border-radius: 4px;
@@ -152,80 +203,8 @@ export class FilterGroupView extends WithDisposable(ShadowlessElement) {
       background-color: var(--affine-background-error-color);
     }
   `;
-  @property({ attribute: false })
-  accessor depth = 1;
 
-  @property({ attribute: false })
-  accessor data!: FilterGroup;
-
-  @property({ attribute: false })
-  accessor vars!: Variable[];
-
-  @property({ attribute: false })
-  accessor setData!: (filter: FilterGroup) => void;
-
-  private opMap = {
-    and: 'And',
-    or: 'Or',
-  };
-
-  private _setFilter = (index: number, filter: Filter) => {
-    this.setData({
-      ...this.data,
-      conditions: this.data.conditions.map((v, i) =>
-        index === i ? filter : v
-      ),
-    });
-  };
-
-  private _addNew = (e: MouseEvent) => {
-    if (this.isMaxDepth) {
-      this.setData({
-        ...this.data,
-        conditions: [...this.data.conditions, firstFilter(this.vars)],
-      });
-      return;
-    }
-    popAddNewFilter(eventToVRect(e), {
-      value: this.data,
-      onChange: this.setData,
-      vars: this.vars,
-    });
-  };
-  private _selectOp = (event: MouseEvent) => {
-    popFilterableSimpleMenu(eventToVRect(event), [
-      {
-        type: 'action',
-        name: 'And',
-        select: () => {
-          this.setData({
-            ...this.data,
-            op: 'and',
-          });
-        },
-      },
-      {
-        type: 'action',
-        name: 'Or',
-        select: () => {
-          this.setData({
-            ...this.data,
-            op: 'or',
-          });
-        },
-      },
-    ]);
-  };
-
-  @state()
-  accessor containerClass:
-    | {
-        index: number;
-        class: string;
-      }
-    | undefined = undefined;
-
-  private _clickConditionOps(target: ReferenceElement, i: number) {
+  private _clickConditionOps(target: HTMLElement, i: number) {
     const filter = this.data.conditions[i];
     popFilterableSimpleMenu(target, [
       {
@@ -301,7 +280,7 @@ export class FilterGroupView extends WithDisposable(ShadowlessElement) {
           const clickOps = (e: MouseEvent) => {
             e.stopPropagation();
             e.preventDefault();
-            this._clickConditionOps(eventToVRect(e), i);
+            this._clickConditionOps(e.target as HTMLElement, i);
           };
           let op: TemplateResult;
           if (i === 0) {
@@ -361,6 +340,26 @@ export class FilterGroupView extends WithDisposable(ShadowlessElement) {
       </div>
     `;
   }
+
+  @state()
+  accessor containerClass:
+    | {
+        index: number;
+        class: string;
+      }
+    | undefined = undefined;
+
+  @property({ attribute: false })
+  accessor data!: FilterGroup;
+
+  @property({ attribute: false })
+  accessor depth = 1;
+
+  @property({ attribute: false })
+  accessor setData!: (filter: FilterGroup) => void;
+
+  @property({ attribute: false })
+  accessor vars!: Variable[];
 }
 
 declare global {

@@ -1,17 +1,18 @@
+import type { Text } from '@blocksuite/store';
+
 import { IS_MAC } from '@blocksuite/global/env';
 import { assertExists } from '@blocksuite/global/utils';
-import type { Text } from '@blocksuite/store';
 import { css } from 'lit';
 import { customElement, property, query } from 'lit/decorators.js';
 import { html } from 'lit/static-html.js';
 
 import type { RichText } from '../../../_common/components/index.js';
+import type { DatabaseBlockComponent } from '../../database-block.js';
+
 import { getViewportElement } from '../../../_common/utils/query.js';
+import { isValidUrl } from '../../../_common/utils/url.js';
 import { HostContextKey } from '../../context/host-context.js';
 import { BaseCellRenderer } from '../../data-view/column/index.js';
-import type { DataViewKanbanManager } from '../../data-view/view/presets/kanban/kanban-view-manager.js';
-import type { DataViewTableManager } from '../../data-view/view/presets/table/table-view-manager.js';
-import type { DatabaseBlockComponent } from '../../database-block.js';
 
 const styles = css`
   data-view-header-area-text {
@@ -73,39 +74,29 @@ const styles = css`
 `;
 
 abstract class BaseTextCell extends BaseCellRenderer<Text> {
-  override accessor view!: DataViewTableManager | DataViewKanbanManager;
   static override styles = styles;
-  @property({ attribute: false })
-  accessor showIcon = false;
-  get service() {
-    return this.view
-      .getContext(HostContextKey)
-      ?.std.spec.getService('affine:database');
+
+  renderIcon() {
+    if (!this.showIcon) {
+      return;
+    }
+    const iconColumn = this.view.header$.value.iconColumn;
+    if (!iconColumn) return;
+
+    const icon = this.view.cellGetValue(this.cell.rowId, iconColumn) as string;
+    if (!icon) return;
+
+    return html`<div class="data-view-header-area-icon">${icon}</div>`;
   }
 
-  get inlineManager() {
-    return this.service?.inlineManager;
-  }
-  get attributesSchema() {
-    return this.inlineManager?.getSchema();
-  }
   get attributeRenderer() {
     return this.inlineManager?.getRenderer();
   }
-  get topContenteditableElement() {
-    const databaseBlock =
-      this.closest<DatabaseBlockComponent>('affine-database');
-    return databaseBlock?.topContenteditableElement;
+
+  get attributesSchema() {
+    return this.inlineManager?.getSchema();
   }
 
-  get titleColumn() {
-    const columnId = this.view.header.titleColumn;
-    assertExists(columnId);
-    return this.view.columnGet(columnId);
-  }
-
-  @query('rich-text')
-  accessor richText!: RichText;
   get inlineEditor() {
     assertExists(this.richText);
     const inlineEditor = this.richText.inlineEditor;
@@ -113,19 +104,33 @@ abstract class BaseTextCell extends BaseCellRenderer<Text> {
     return inlineEditor;
   }
 
-  renderIcon() {
-    if (!this.showIcon) {
-      return;
-    }
-
-    const iconColumn = this.view.header.iconColumn;
-    if (!iconColumn) return;
-
-    const icon = this.view.columnGet(iconColumn).getValue(this.rowId) as string;
-    if (!icon) return;
-
-    return html`<div class="data-view-header-area-icon">${icon}</div>`;
+  get inlineManager() {
+    return this.service?.inlineManager;
   }
+
+  get service() {
+    return this.view
+      .getContext(HostContextKey)
+      ?.std.spec.getService('affine:database');
+  }
+
+  get titleColumn() {
+    const columnId = this.view.header$.value.titleColumn;
+    assertExists(columnId);
+    return this.view.columnGet(columnId);
+  }
+
+  get topContenteditableElement() {
+    const databaseBlock =
+      this.closest<DatabaseBlockComponent>('affine-database');
+    return databaseBlock?.topContenteditableElement;
+  }
+
+  @query('rich-text')
+  accessor richText!: RichText;
+
+  @property({ attribute: false })
+  accessor showIcon = false;
 }
 
 @customElement('data-view-header-area-text')
@@ -134,7 +139,6 @@ export class HeaderAreaTextCell extends BaseTextCell {
     return html`${this.renderIcon()}
       <rich-text
         .yText=${this.value}
-        .inlineEventSource=${this.topContenteditableElement}
         .attributesSchema=${this.attributesSchema}
         .attributeRenderer=${this.attributeRenderer}
         .embedChecker=${this.inlineManager?.embedChecker}
@@ -147,9 +151,123 @@ export class HeaderAreaTextCell extends BaseTextCell {
 
 @customElement('data-view-header-area-text-editing')
 export class HeaderAreaTextCellEditing extends BaseTextCell {
+  private _onCopy = (e: ClipboardEvent) => {
+    const inlineEditor = this.inlineEditor;
+    assertExists(inlineEditor);
+
+    const inlineRange = inlineEditor.getInlineRange();
+    if (!inlineRange) return;
+
+    const text = inlineEditor.yTextString.slice(
+      inlineRange.index,
+      inlineRange.index + inlineRange.length
+    );
+
+    e.clipboardData?.setData('text/plain', text);
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  private _onCut = (e: ClipboardEvent) => {
+    const inlineEditor = this.inlineEditor;
+    assertExists(inlineEditor);
+
+    const inlineRange = inlineEditor.getInlineRange();
+    if (!inlineRange) return;
+
+    const text = inlineEditor.yTextString.slice(
+      inlineRange.index,
+      inlineRange.index + inlineRange.length
+    );
+    inlineEditor.deleteText(inlineRange);
+    inlineEditor.setInlineRange({
+      index: inlineRange.index,
+      length: 0,
+    });
+
+    e.clipboardData?.setData('text/plain', text);
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  private _onPaste = async (e: ClipboardEvent) => {
+    const inlineEditor = this.inlineEditor;
+    assertExists(inlineEditor);
+
+    const inlineRange = inlineEditor.getInlineRange();
+    if (!inlineRange) return;
+
+    const text = e.clipboardData
+      ?.getData('text/plain')
+      ?.replace(/\r?\n|\r/g, '\n');
+    if (!text) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (isValidUrl(text)) {
+      const std = this.std;
+      const result = await std?.spec
+        .getService('affine:page')
+        .quickSearchService?.searchDoc({
+          userInput: text,
+          skipSelection: true,
+        });
+      if (result && 'docId' in result) {
+        const text = ' ';
+        inlineEditor.insertText(inlineRange, text, {
+          reference: {
+            type: 'LinkedPage',
+            pageId: result.docId,
+          },
+        });
+        inlineEditor.setInlineRange({
+          index: inlineRange.index + text.length,
+          length: 0,
+        });
+      } else {
+        inlineEditor.insertText(inlineRange, text, {
+          link: text,
+        });
+        inlineEditor.setInlineRange({
+          index: inlineRange.index + text.length,
+          length: 0,
+        });
+      }
+    } else {
+      inlineEditor.insertText(inlineRange, text);
+      inlineEditor.setInlineRange({
+        index: inlineRange.index + text.length,
+        length: 0,
+      });
+    }
+  };
+
+  private get std() {
+    const host = this.view.getContext(HostContextKey);
+    return host?.std;
+  }
+
+  override connectedCallback() {
+    super.connectedCallback();
+    const selectAll = (e: KeyboardEvent) => {
+      if (e.key === 'a' && (IS_MAC ? e.metaKey : e.ctrlKey)) {
+        e.stopPropagation();
+        e.preventDefault();
+        this.inlineEditor.selectAll();
+      }
+    };
+    this.addEventListener('keydown', selectAll);
+    this.disposables.add(() => {
+      this.removeEventListener('keydown', selectAll);
+    });
+  }
+
   override firstUpdated(props: Map<string, unknown>) {
     super.firstUpdated(props);
-
+    this.disposables.addFromEvent(this.richText, 'copy', this._onCopy);
+    this.disposables.addFromEvent(this.richText, 'cut', this._onCut);
+    this.disposables.addFromEvent(this.richText, 'paste', e => {
+      this._onPaste(e).catch(console.error);
+    });
     this.richText.updateComplete
       .then(() => {
         this.inlineEditor.focusEnd();
@@ -171,21 +289,6 @@ export class HeaderAreaTextCellEditing extends BaseTextCell {
       .catch(console.error);
   }
 
-  public override connectedCallback() {
-    super.connectedCallback();
-    const selectAll = (e: KeyboardEvent) => {
-      if (e.key === 'a' && (IS_MAC ? e.metaKey : e.ctrlKey)) {
-        e.stopPropagation();
-        e.preventDefault();
-        this.inlineEditor.selectAll();
-      }
-    };
-    this.addEventListener('keydown', selectAll);
-    this.disposables.add(() => {
-      this.removeEventListener('keydown', selectAll);
-    });
-  }
-
   override render() {
     return html`${this.renderIcon()}
       <rich-text
@@ -196,11 +299,12 @@ export class HeaderAreaTextCellEditing extends BaseTextCell {
         .embedChecker=${this.inlineManager?.embedChecker}
         .markdownShortcutHandler=${this.inlineManager?.markdownShortcutHandler}
         .readonly=${this.readonly}
+        .enableClipboard=${false}
         .verticalScrollContainerGetter=${() =>
           this.topContenteditableElement?.host
             ? getViewportElement(this.topContenteditableElement.host)
             : null}
-        class="data-view-header-area-rich-text"
+        class="data-view-header-area-rich-text can-link-doc"
       ></rich-text>`;
   }
 }

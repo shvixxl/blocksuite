@@ -15,16 +15,9 @@ export class SidePanel extends ShadowlessElement {
       display: none;
     }
   `;
+
   currentContent: HTMLElement | null = null;
-  showContent(ele: HTMLElement) {
-    if (this.currentContent) {
-      this.currentContent.remove();
-    }
-    this.style.display = 'block';
-    ele.classList.add('blocksuite-overlay');
-    this.currentContent = ele;
-    this.append(ele);
-  }
+
   hideContent() {
     if (this.currentContent) {
       this.style.display = 'none';
@@ -35,6 +28,15 @@ export class SidePanel extends ShadowlessElement {
 
   protected override render(): unknown {
     return html``;
+  }
+
+  showContent(ele: HTMLElement) {
+    if (this.currentContent) {
+      this.currentContent.remove();
+    }
+    this.style.display = 'block';
+    this.currentContent = ele;
+    this.append(ele);
   }
 
   toggle(ele: HTMLElement) {

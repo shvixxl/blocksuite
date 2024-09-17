@@ -1,15 +1,12 @@
 import { ShadowlessElement, WithDisposable } from '@blocksuite/block-std';
-import type { ReferenceElement } from '@floating-ui/dom';
-import { css, html, type TemplateResult } from 'lit';
+import { type TemplateResult, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 
-import {
-  createPopup,
-  eventToVRect,
-} from '../../../../_common/components/index.js';
-import { AddCursorIcon } from '../../../../_common/icons/index.js';
 import type { Filter, FilterGroup, Variable } from '../../common/ast.js';
+
+import { createPopup } from '../../../../_common/components/index.js';
+import { AddCursorIcon } from '../../../../_common/icons/index.js';
 import { CrossIcon, FilterIcon } from '../../common/icons/index.js';
 import { popCreateFilter } from '../../common/ref/ref.js';
 import { renderTemplate } from '../../utils/uni-component/render-template.js';
@@ -17,6 +14,51 @@ import { popFilterModal } from './filter-modal.js';
 
 @customElement('filter-bar')
 export class FilterBar extends WithDisposable(ShadowlessElement) {
+  private _setFilter = (index: number, filter: Filter) => {
+    this.setData({
+      ...this.data,
+      conditions: this.data.conditions.map((v, i) =>
+        index === i ? filter : v
+      ),
+    });
+  };
+
+  private addFilter = (e: MouseEvent) => {
+    const element = e.target as HTMLElement;
+    popCreateFilter(element, {
+      vars: this.vars,
+      onSelect: filter => {
+        const index = this.data.conditions.length;
+        this.setData({
+          ...this.data,
+          conditions: [...this.data.conditions, filter],
+        });
+        requestAnimationFrame(() => {
+          this.expandGroup(element, index);
+        });
+      },
+    });
+  };
+
+  private expandGroup = (position: HTMLElement, i: number) => {
+    const value = this.data.conditions[i];
+    if (value.type !== 'group') {
+      return;
+    }
+    popFilterModal(position, {
+      isRoot: false,
+      vars: this.vars,
+      value: value,
+      onBack: () => {
+        // do nothing
+      },
+      onChange: filter => this._setFilter(i, filter),
+      onDelete: () => {
+        this.deleteFilter(i);
+      },
+    });
+  };
+
   static override styles = css`
     filter-bar {
       margin-top: 8px;
@@ -47,95 +89,6 @@ export class FilterBar extends WithDisposable(ShadowlessElement) {
       line-height: 22px;
     }
   `;
-  @property({ attribute: false })
-  accessor data!: FilterGroup;
-
-  @property({ attribute: false })
-  accessor vars!: Variable[];
-
-  @property({ attribute: false })
-  accessor setData!: (filter: FilterGroup) => void;
-  private _setFilter = (index: number, filter: Filter) => {
-    this.setData({
-      ...this.data,
-      conditions: this.data.conditions.map((v, i) =>
-        index === i ? filter : v
-      ),
-    });
-  };
-  override updated() {
-    this.updateMoreFilterPanel?.();
-  }
-  private addFilter = (e: MouseEvent) => {
-    const position = eventToVRect(e);
-    popCreateFilter(position, {
-      vars: this.vars,
-      onSelect: filter => {
-        const index = this.data.conditions.length;
-        this.setData({
-          ...this.data,
-          conditions: [...this.data.conditions, filter],
-        });
-        requestAnimationFrame(() => {
-          this.expandGroup(position, index);
-        });
-      },
-    });
-  };
-  private expandGroup = (position: ReferenceElement, i: number) => {
-    const value = this.data.conditions[i];
-    if (value.type !== 'group') {
-      return;
-    }
-    popFilterModal(position, {
-      isRoot: false,
-      vars: this.vars,
-      value: value,
-      onBack: () => {
-        // do nothing
-      },
-      onChange: filter => this._setFilter(i, filter),
-      onDelete: () => {
-        this.deleteFilter(i);
-      },
-    });
-  };
-  renderMoreFilter = (count: number): TemplateResult => {
-    return html` <div
-      class="dv-shadow-2 dv-round-8"
-      style="padding: 8px;background-color: var(--affine-background-overlay-panel-color);display:flex;flex-direction: column;gap: 8px;"
-    >
-      ${repeat(
-        this.data.conditions.slice(count),
-        (_, i) =>
-          html` <div style="width: max-content;">
-            ${this.renderCondition(i + count)}
-          </div>`
-      )}
-      <div class="dv-divider-h"></div>
-      ${this.renderAddFilter()}
-    </div>`;
-  };
-  updateMoreFilterPanel?: () => void;
-
-  showMoreFilter = (e: MouseEvent, count: number) => {
-    const ins = renderTemplate(() => this.renderMoreFilter(count));
-    ins.style.position = 'absolute';
-    this.updateMoreFilterPanel = () => {
-      const max = this.data.conditions.length;
-      if (count === max) {
-        close();
-        this.updateMoreFilterPanel = undefined;
-        return;
-      }
-      ins.requestUpdate();
-    };
-    const close = createPopup(eventToVRect(e), ins, {
-      onClose: () => {
-        this.updateMoreFilterPanel = undefined;
-      },
-    });
-  };
 
   renderAddFilter = () => {
     return html` <div
@@ -164,6 +117,60 @@ export class FilterBar extends WithDisposable(ShadowlessElement) {
     </div>`;
   };
 
+  renderMoreFilter = (count: number): TemplateResult => {
+    return html` <div
+      class="dv-shadow-2 dv-round-8"
+      style="padding: 8px;background-color: var(--affine-background-overlay-panel-color);display:flex;flex-direction: column;gap: 8px;"
+    >
+      ${repeat(
+        this.data.conditions.slice(count),
+        (_, i) =>
+          html` <div style="width: max-content;">
+            ${this.renderCondition(i + count)}
+          </div>`
+      )}
+      <div class="dv-divider-h"></div>
+      ${this.renderAddFilter()}
+    </div>`;
+  };
+
+  showMoreFilter = (e: MouseEvent, count: number) => {
+    const ins = renderTemplate(() => this.renderMoreFilter(count));
+    ins.style.position = 'absolute';
+    this.updateMoreFilterPanel = () => {
+      const max = this.data.conditions.length;
+      if (count === max) {
+        close();
+        this.updateMoreFilterPanel = undefined;
+        return;
+      }
+      ins.requestUpdate();
+    };
+    const close = createPopup(e.target as HTMLElement, ins, {
+      onClose: () => {
+        this.updateMoreFilterPanel = undefined;
+      },
+    });
+  };
+
+  updateMoreFilterPanel?: () => void;
+
+  private deleteFilter(i: number) {
+    this.setData({
+      ...this.data,
+      conditions: this.data.conditions.filter((_, index) => index !== i),
+    });
+  }
+
+  override render() {
+    return html`
+      <component-overflow
+        .renderItem="${this.renderFilters()}"
+        .renderMore="${this.renderMore}"
+      ></component-overflow>
+    `;
+  }
+
   renderCondition(i: number) {
     const condition = this.data.conditions[i];
     const deleteFilter = () => {
@@ -179,7 +186,7 @@ export class FilterBar extends WithDisposable(ShadowlessElement) {
       ></filter-condition-view>`;
     }
     const expandGroup = (e: MouseEvent) => {
-      this.expandGroup(eventToVRect(e), i);
+      this.expandGroup(e.target as HTMLElement, i);
     };
     const length = condition.conditions.length;
     const text = length > 1 ? `${length} rules` : `${length} rule`;
@@ -208,21 +215,18 @@ export class FilterBar extends WithDisposable(ShadowlessElement) {
     return this.data.conditions.map((_, i) => () => this.renderCondition(i));
   }
 
-  override render() {
-    return html`
-      <component-overflow
-        .renderItem="${this.renderFilters()}"
-        .renderMore="${this.renderMore}"
-      ></component-overflow>
-    `;
+  override updated() {
+    this.updateMoreFilterPanel?.();
   }
 
-  private deleteFilter(i: number) {
-    this.setData({
-      ...this.data,
-      conditions: this.data.conditions.filter((_, index) => index !== i),
-    });
-  }
+  @property({ attribute: false })
+  accessor data!: FilterGroup;
+
+  @property({ attribute: false })
+  accessor setData!: (filter: FilterGroup) => void;
+
+  @property({ attribute: false })
+  accessor vars!: Variable[];
 }
 
 declare global {

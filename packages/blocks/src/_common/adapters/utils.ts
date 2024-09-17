@@ -1,5 +1,6 @@
-import { isEqual } from '@blocksuite/global/utils';
 import type { DeltaInsert } from '@blocksuite/inline';
+
+import { isEqual } from '@blocksuite/global/utils';
 
 export const fetchImage = async (
   url: string,
@@ -8,6 +9,9 @@ export const fetchImage = async (
 ) => {
   try {
     if (!proxy) {
+      return await fetch(url, init);
+    }
+    if (url.startsWith('blob:')) {
       return await fetch(url, init);
     }
     if (url.startsWith('data:')) {
@@ -26,7 +30,7 @@ export const fetchImage = async (
       .catch(() => fetch(url, init));
   } catch (error) {
     console.warn('Error fetching image:', error);
-    throw error;
+    return null;
   }
 };
 

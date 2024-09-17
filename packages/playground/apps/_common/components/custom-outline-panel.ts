@@ -1,9 +1,7 @@
+import type { AffineEditorContainer } from '@blocksuite/presets';
+
 import { WithDisposable } from '@blocksuite/block-std';
-import {
-  type AffineEditorContainer,
-  registerOutlinePanelComponents,
-} from '@blocksuite/presets';
-import { css, html, LitElement } from 'lit';
+import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 
 @customElement('custom-outline-panel')
@@ -12,7 +10,7 @@ export class CustomOutlinePanel extends WithDisposable(LitElement) {
     .custom-outline-container {
       position: absolute;
       top: 0;
-      right: 0;
+      right: 16px;
       border: 1px solid var(--affine-border-color, #e3e2e4);
       background: var(--affine-background-overlay-panel-color);
       height: 100vh;
@@ -21,44 +19,33 @@ export class CustomOutlinePanel extends WithDisposable(LitElement) {
       z-index: 1;
     }
   `;
-  @state()
-  private accessor _show = false;
-
-  @property({ attribute: false })
-  accessor editor!: AffineEditorContainer;
 
   private _renderPanel() {
-    return html`<outline-panel
+    return html`<affine-outline-panel
       .editor=${this.editor}
       .fitPadding=${[50, 360, 50, 50]}
-    ></outline-panel>`;
-  }
-
-  public toggleDisplay() {
-    this._show = !this._show;
-  }
-
-  override connectedCallback(): void {
-    super.connectedCallback();
-
-    registerOutlinePanelComponents(components => {
-      Object.entries(components).forEach(([name, component]) => {
-        customElements.define(name, component);
-      });
-    });
+    ></affine-outline-panel>`;
   }
 
   override render() {
     return html`
       ${this._show
         ? html`
-            <div class="custom-outline-container blocksuite-overlay">
-              ${this._renderPanel()}
-            </div>
+            <div class="custom-outline-container">${this._renderPanel()}</div>
           `
-        : null}
+        : nothing}
     `;
   }
+
+  toggleDisplay() {
+    this._show = !this._show;
+  }
+
+  @state()
+  private accessor _show = false;
+
+  @property({ attribute: false })
+  accessor editor!: AffineEditorContainer;
 }
 
 declare global {

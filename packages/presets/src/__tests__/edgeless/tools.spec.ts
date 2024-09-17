@@ -3,6 +3,7 @@ import type {
   SurfaceBlockComponent,
 } from '@blocksuite/blocks';
 import type {} from '@blocksuite/blocks';
+
 import { beforeEach, describe, expect, test } from 'vitest';
 
 import { wait } from '../utils/common.js';
@@ -39,13 +40,15 @@ describe('default tool', () => {
     await wait();
 
     service.viewport.setViewport(1, [
-      surface.renderer.width / 2,
-      surface.renderer.height / 2,
+      service.viewport.width / 2,
+      service.viewport.height / 2,
     ]);
 
     click(edgeless.host, { x: 0, y: 50 });
 
-    expect(edgeless.service.selection.selections[0].elements).toEqual([id]);
+    expect(edgeless.service.selection.surfaceSelections[0].elements).toEqual([
+      id,
+    ]);
   });
 
   test('element drag moving', async () => {
@@ -57,8 +60,8 @@ describe('default tool', () => {
     await wait();
 
     edgeless.service.viewport.setViewport(1, [
-      surface.renderer.width / 2,
-      surface.renderer.height / 2,
+      edgeless.service.viewport.width / 2,
+      edgeless.service.viewport.height / 2,
     ]);
     await wait();
 
@@ -76,13 +79,15 @@ describe('default tool', () => {
     await wait();
 
     edgeless.service.viewport.setViewport(1, [
-      surface.renderer.width / 2,
-      surface.renderer.height / 2,
+      surface.renderer.viewport.width / 2,
+      surface.renderer.viewport.height / 2,
     ]);
     await wait();
 
     click(edgeless.host, { x: 50, y: 50 });
-    expect(edgeless.service.selection.selections[0].elements).toEqual([noteId]);
+    expect(edgeless.service.selection.surfaceSelections[0].elements).toEqual([
+      noteId,
+    ]);
     drag(edgeless.host, { x: 50, y: 50 }, { x: 150, y: 150 });
     await wait();
 

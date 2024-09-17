@@ -1,12 +1,13 @@
 import type { BlockService } from '@blocksuite/block-std';
+
 import { DisposableGroup, Slot } from '@blocksuite/global/utils';
-import { isPlainObject, recursive } from 'merge';
+import { isPlainObject, merge } from 'merge';
 import { z } from 'zod';
 
 import {
-  DEFAULT_NOTE_COLOR,
-  NOTE_SHADOWS,
-  NoteColorsSchema,
+  DEFAULT_NOTE_BACKGROUND_COLOR,
+  DEFAULT_NOTE_SHADOW,
+  NoteBackgroundColorsSchema,
   NoteShadowsSchema,
 } from '../../_common/edgeless/note/consts.js';
 import { LineWidth, NoteDisplayMode } from '../../_common/types.js';
@@ -16,7 +17,6 @@ import {
   GET_DEFAULT_TEXT_COLOR,
   LineColorsSchema,
 } from '../../root-block/edgeless/components/panel/color-panel.js';
-import type { EdgelessElementType } from '../../root-block/edgeless/edgeless-types.js';
 import {
   FontFamily,
   FontStyle,
@@ -27,6 +27,7 @@ import {
   TextVerticalAlign,
 } from '../consts.js';
 import {
+  ConnectorMode,
   DEFAULT_FRONT_END_POINT_STYLE,
   DEFAULT_REAR_END_POINT_STYLE,
 } from '../element-model/connector.js';
@@ -59,30 +60,48 @@ const TextVerticalAlignSchema = z.nativeEnum(TextVerticalAlign);
 const ShapeTypeSchema = z.nativeEnum(ShapeType);
 const NoteDisplayModeSchema = z.nativeEnum(NoteDisplayMode);
 
+const ColorSchema = z.union([
+  z.object({
+    normal: z.string(),
+  }),
+  z.object({
+    light: z.string(),
+    dark: z.string(),
+  }),
+]);
+const LineColorSchema = z.union([LineColorsSchema, ColorSchema]);
+const ShapeFillColorSchema = z.union([FillColorsSchema, ColorSchema]);
+const ShapeStrokeColorSchema = z.union([StrokeColorsSchema, ColorSchema]);
+const TextColorSchema = z.union([z.string(), ColorSchema]);
+const NoteBackgroundColorSchema = z.union([
+  NoteBackgroundColorsSchema,
+  ColorSchema,
+]);
+
 const LastPropsSchema = z.object({
   connector: z.object({
     frontEndpointStyle: ConnectorEndpointSchema,
     rearEndpointStyle: ConnectorEndpointSchema,
     strokeStyle: StrokeStyleSchema,
-    stroke: LineColorsSchema,
+    stroke: LineColorSchema,
     strokeWidth: LineWidthSchema,
     rough: z.boolean(),
     mode: z.number().optional(),
   }),
   brush: z.object({
-    color: LineColorsSchema,
+    color: LineColorSchema,
     lineWidth: LineWidthSchema,
   }),
   shape: z.object({
     shapeType: ShapeTypeSchema,
-    fillColor: FillColorsSchema,
-    strokeColor: StrokeColorsSchema,
+    fillColor: ShapeFillColorSchema,
+    strokeColor: ShapeStrokeColorSchema,
     shapeStyle: ShapeStyleSchema,
     filled: z.boolean(),
     radius: z.number(),
     strokeWidth: z.number().optional(),
     strokeStyle: StrokeStyleSchema.optional(),
-    color: z.string().optional(),
+    color: TextColorSchema.optional(),
     fontSize: ShapeTextFontSizeSchema.optional(),
     fontFamily: FontFamilySchema.optional(),
     fontWeight: FontWeightSchema.optional(),
@@ -93,15 +112,22 @@ const LastPropsSchema = z.object({
     roughness: z.number().optional(),
   }),
   text: z.object({
-    color: z.string(),
+    color: TextColorSchema,
     fontFamily: FontFamilySchema,
     textAlign: TextAlignSchema,
     fontWeight: FontWeightSchema,
     fontStyle: FontStyleSchema,
     fontSize: z.number(),
   }),
+  'affine:edgeless-text': z.object({
+    color: TextColorSchema,
+    fontFamily: FontFamilySchema,
+    textAlign: TextAlignSchema,
+    fontWeight: FontWeightSchema,
+    fontStyle: FontStyleSchema,
+  }),
   'affine:note': z.object({
-    background: NoteColorsSchema,
+    background: NoteBackgroundColorSchema,
     displayMode: NoteDisplayModeSchema.optional(),
     edgeless: z.object({
       style: z.object({
@@ -115,6 +141,7 @@ const LastPropsSchema = z.object({
 });
 
 export type LastProps = z.infer<typeof LastPropsSchema>;
+export type LastPropsKey = keyof LastProps;
 
 const SESSION_PROP_KEY = 'blocksuite:prop:record';
 
@@ -148,6 +175,7 @@ const LocalPropsSchema = z.object({
 type SessionProps = z.infer<typeof SessionPropsSchema>;
 type LocalProps = z.infer<typeof LocalPropsSchema>;
 type StorageProps = SessionProps & LocalProps;
+type StoragePropsKey = keyof StorageProps;
 
 function isLocalProp(key: string): key is keyof LocalProps {
   return key in LocalPropsSchema.shape;
@@ -162,6 +190,8 @@ export type SerializedViewport = z.infer<
 >;
 
 export class EditPropsStore {
+  private _disposables = new DisposableGroup();
+
   private _lastProps: LastProps = {
     connector: {
       frontEndpointStyle: DEFAULT_FRONT_END_POINT_STYLE,
@@ -170,6 +200,7 @@ export class EditPropsStore {
       strokeStyle: StrokeStyle.Solid,
       strokeWidth: LineWidth.Two,
       rough: false,
+      mode: ConnectorMode.Curve,
     },
     brush: {
       color: GET_DEFAULT_LINE_COLOR(),
@@ -194,26 +225,35 @@ export class EditPropsStore {
       fontStyle: FontStyle.Normal,
       fontSize: 24,
     },
+    'affine:edgeless-text': {
+      color: GET_DEFAULT_TEXT_COLOR(),
+      fontFamily: FontFamily.Inter,
+      textAlign: TextAlign.Left,
+      fontWeight: FontWeight.Regular,
+      fontStyle: FontStyle.Normal,
+    },
     'affine:note': {
-      background: DEFAULT_NOTE_COLOR,
+      background: DEFAULT_NOTE_BACKGROUND_COLOR,
       displayMode: NoteDisplayMode.DocAndEdgeless,
       edgeless: {
         style: {
-          borderRadius: 8,
+          borderRadius: 0,
           borderSize: 4,
-          borderStyle: StrokeStyle.Solid,
-          shadowType: NOTE_SHADOWS[1],
+          borderStyle: StrokeStyle.None,
+          shadowType: DEFAULT_NOTE_SHADOW,
         },
       },
     },
   };
 
-  private _disposables = new DisposableGroup();
-
   slots = {
     lastPropsUpdated: new Slot<{
-      type: keyof LastProps;
+      type: LastPropsKey;
       props: Record<string, unknown>;
+    }>(),
+    storageUpdated: new Slot<{
+      key: StoragePropsKey;
+      value: StorageProps[StoragePropsKey];
     }>(),
   };
 
@@ -227,35 +267,11 @@ export class EditPropsStore {
     }
   }
 
-  getLastProps<T extends keyof LastProps>(type: T) {
-    return this._lastProps[type] as LastProps[T];
+  private _getStorage<T extends StoragePropsKey>(key: T) {
+    return isSessionProp(key) ? sessionStorage : localStorage;
   }
 
-  record(
-    type: EdgelessElementType,
-    recordProps: Partial<LastProps[keyof LastProps]>
-  ) {
-    if (!isLastPropType(type)) return;
-
-    const props = this._lastProps[type];
-    const overrideProps = extractProps(
-      recordProps,
-      LastPropsSchema.shape[type]
-    );
-    if (Object.keys(overrideProps).length === 0) return;
-
-    recursive(props, overrideProps);
-    this.slots.lastPropsUpdated.emit({ type, props: overrideProps });
-  }
-
-  apply(type: EdgelessElementType, props: Record<string, unknown>) {
-    if (!isLastPropType(type)) return;
-
-    const lastProps = this._lastProps[type];
-    deepAssign(props, lastProps);
-  }
-
-  private _getKey<T extends keyof StorageProps>(key: T) {
+  private _getStorageKey<T extends StoragePropsKey>(key: T) {
     const id = this._service.doc.id;
     switch (key) {
       case 'viewport':
@@ -279,14 +295,29 @@ export class EditPropsStore {
     }
   }
 
-  setItem<T extends keyof StorageProps>(key: T, value: StorageProps[T]) {
-    this._getStorage(key).setItem(this._getKey(key), JSON.stringify(value));
+  applyLastProps(
+    type: BlockSuite.EdgelessModelKeys,
+    props: Record<string, unknown>
+  ) {
+    if (!isLastPropType(type)) return;
+
+    const lastProps = this._lastProps[type];
+    deepAssign(props, lastProps);
   }
 
-  getItem<T extends keyof StorageProps>(key: T) {
+  dispose() {
+    this._disposables.dispose();
+    this.slots.lastPropsUpdated.dispose();
+  }
+
+  getLastProps<T extends LastPropsKey>(type: T) {
+    return this._lastProps[type] as LastProps[T];
+  }
+
+  getStorage<T extends StoragePropsKey>(key: T) {
     try {
       const storage = this._getStorage(key);
-      const value = storage.getItem(this._getKey(key));
+      const value = storage.getItem(this._getStorageKey(key));
       if (!value) return null;
       if (isLocalProp(key)) {
         return LocalPropsSchema.shape[key].parse(
@@ -304,13 +335,31 @@ export class EditPropsStore {
     }
   }
 
-  private _getStorage<T extends keyof StorageProps>(key: T) {
-    return isSessionProp(key) ? sessionStorage : localStorage;
+  recordLastProps(
+    type: BlockSuite.EdgelessModelKeys,
+    recordProps: Partial<LastProps[LastPropsKey]>
+  ) {
+    if (!isLastPropType(type)) return;
+
+    const props = this._lastProps[type];
+    const overrideProps = extractProps(
+      recordProps,
+      LastPropsSchema.shape[type]
+    );
+    if (Object.keys(overrideProps).length === 0) return;
+
+    merge(props, overrideProps);
+    this.slots.lastPropsUpdated.emit({ type, props: overrideProps });
   }
 
-  dispose() {
-    this._disposables.dispose();
-    this.slots.lastPropsUpdated.dispose();
+  setStorage<T extends StoragePropsKey>(key: T, value: StorageProps[T]) {
+    const oldValue = this.getStorage(key);
+    this._getStorage(key).setItem(
+      this._getStorageKey(key),
+      JSON.stringify(value)
+    );
+    if (oldValue === value) return;
+    this.slots.storageUpdated.emit({ key, value });
   }
 }
 
@@ -323,6 +372,13 @@ function extractProps(
   Object.entries(props).forEach(([key, value]) => {
     if (!(key in ref.shape)) return;
     if (isPlainObject(value)) {
+      if (isColorType(key, value)) {
+        const color = processColorValue(value as z.infer<typeof ColorSchema>);
+        if (Object.keys(color).length === 0) return;
+        result[key] = color;
+        return;
+      }
+
       result[key] = extractProps(
         props[key] as Record<string, unknown>,
         ref.shape[key] as z.ZodObject<z.ZodRawShape>
@@ -335,7 +391,9 @@ function extractProps(
   return result;
 }
 
-function isLastPropType(type: EdgelessElementType): type is keyof LastProps {
+function isLastPropType(
+  type: BlockSuite.EdgelessModelKeys
+): type is keyof LastProps {
   return Object.keys(LastPropsSchema.shape).includes(type);
 }
 
@@ -360,4 +418,21 @@ function deepAssign(
   });
 
   return target;
+}
+
+function isColorType(key: string, value: unknown) {
+  return (
+    ['background', 'color', 'stroke', 'fill', 'Color'].some(
+      stuff => key.startsWith(stuff) || key.endsWith(stuff)
+    ) && ColorSchema.safeParse(value).success
+  );
+}
+
+// Don't want the user to create a transparent element, so the alpha value is removed.
+function processColorValue(value: z.infer<typeof ColorSchema>) {
+  const obj: Record<string, string> = {};
+  for (const [k, v] of Object.entries(value)) {
+    obj[k] = v.startsWith('#') ? v.substring(0, 7) : v;
+  }
+  return obj;
 }

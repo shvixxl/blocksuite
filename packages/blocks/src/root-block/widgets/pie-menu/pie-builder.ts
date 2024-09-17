@@ -1,26 +1,26 @@
 import { assertExists } from '@blocksuite/global/utils';
 
-import type { CssVariableName } from '../../../_common/theme/css-variables.js';
-import { ColorUnit } from '../../edgeless/components/panel/color-panel.js';
-import {
-  type ActionFunction,
-  type PieColorNodeModel,
-  type PieCommandNodeModel,
-  type PieMenuContext,
-  type PieMenuSchema,
-  type PieNodeModel,
-  type PieSubmenuNodeModel,
+import type {
+  ActionFunction,
+  PieColorNodeModel,
+  PieCommandNodeModel,
+  PieMenuContext,
+  PieMenuSchema,
+  PieNodeModel,
+  PieSubmenuNodeModel,
 } from './base.js';
+
+import { ColorUnit } from '../../edgeless/components/panel/color-panel.js';
 import { PieManager } from './pie-manager.js';
 import { calcNodeAngles, calcNodeWedges, isNodeWithChildren } from './utils.js';
 
 export interface IPieColorPickerNodeProps {
   label: string;
-  active: (ctx: PieMenuContext) => CssVariableName;
+  active: (ctx: PieMenuContext) => string;
   onChange: PieColorNodeModel['onChange'];
   openOnHover?: PieSubmenuNodeModel['openOnHover'];
   hollow?: boolean;
-  colors: { color: CssVariableName }[];
+  colors: { color: string }[];
 }
 
 type PieBuilderConstructorProps = Omit<
@@ -30,6 +30,7 @@ type PieBuilderConstructorProps = Omit<
 
 export class PieMenuBuilder {
   private _schema: PieMenuSchema | null = null;
+
   private _stack: PieNodeModel[] = [];
 
   constructor(base: PieBuilderConstructorProps) {
@@ -46,27 +47,69 @@ export class PieMenuBuilder {
     this._stack.push(this._schema.root);
   }
 
-  command(node: Omit<PieCommandNodeModel, 'type'>) {
+  private _computeAngles(node: PieNodeModel) {
+    if (
+      !isNodeWithChildren(node) ||
+      !node.children ||
+      node.children.length === 0
+    ) {
+      return;
+    }
+    const parentAngle =
+      node.angle == undefined ? undefined : (node.angle + 180) % 360;
+    const angles = calcNodeAngles(node.children, parentAngle);
+    const wedges = calcNodeWedges(angles, parentAngle);
+
+    for (let i = 0; i < node.children.length; ++i) {
+      const child = node.children[i];
+      child.angle = angles[i];
+      child.startAngle = wedges[i].start;
+      child.endAngle = wedges[i].end;
+
+      this._computeAngles(child);
+    }
+  }
+
+  private _currentNode(): PieNodeModel {
+    const node = this._stack[this._stack.length - 1];
+    assertExists(node, 'No node active');
+    return node;
+  }
+
+  beginSubmenu(
+    node: Omit<PieSubmenuNodeModel, 'type' | 'children' | 'role'>,
+    action?: PieSubmenuNodeModel['action']
+  ) {
     const curNode = this._currentNode();
-    const actionNode: PieCommandNodeModel = { ...node, type: 'command' };
+    const submenuNode: PieSubmenuNodeModel = {
+      openOnHover: true,
+      ...node,
+      type: 'submenu',
+      role: action ? 'default' : 'command',
+      action,
+      children: [],
+    };
+    if (submenuNode.action !== undefined)
+      submenuNode.timeoutOverride =
+        PieManager.settings.EXPANDABLE_ACTION_NODE_TIMEOUT;
 
     if (isNodeWithChildren(curNode)) {
-      curNode.children.push(actionNode);
+      curNode.children.push(submenuNode);
     }
+
+    this._stack.push(submenuNode);
 
     return this;
   }
 
-  expandableCommand(
-    node: Omit<PieSubmenuNodeModel, 'type' | 'children' | 'role'> & {
-      action: ActionFunction;
-      submenus: (pie: PieMenuBuilder) => void;
-    }
-  ) {
-    const { icon, label } = node;
-    this.beginSubmenu({ icon, label }, node.action);
-    node.submenus(this);
-    this.endSubmenu();
+  build() {
+    const schema = this._schema;
+    assertExists(schema);
+    this._computeAngles(schema.root);
+
+    this._schema = null;
+    this._stack = [];
+    return schema;
   }
 
   colorPicker(props: IPieColorPickerNodeProps) {
@@ -100,28 +143,13 @@ export class PieMenuBuilder {
     }
   }
 
-  beginSubmenu(
-    node: Omit<PieSubmenuNodeModel, 'type' | 'children' | 'role'>,
-    action?: PieSubmenuNodeModel['action']
-  ) {
+  command(node: Omit<PieCommandNodeModel, 'type'>) {
     const curNode = this._currentNode();
-    const submenuNode: PieSubmenuNodeModel = {
-      openOnHover: true,
-      ...node,
-      type: 'submenu',
-      role: action ? 'default' : 'command',
-      action,
-      children: [],
-    };
-    if (submenuNode.action !== undefined)
-      submenuNode.timeoutOverride =
-        PieManager.settings.EXPANDABLE_ACTION_NODE_TIMEOUT;
+    const actionNode: PieCommandNodeModel = { ...node, type: 'command' };
 
     if (isNodeWithChildren(curNode)) {
-      curNode.children.push(submenuNode);
+      curNode.children.push(actionNode);
     }
-
-    this._stack.push(submenuNode);
 
     return this;
   }
@@ -134,6 +162,18 @@ export class PieMenuBuilder {
     return this;
   }
 
+  expandableCommand(
+    node: Omit<PieSubmenuNodeModel, 'type' | 'children' | 'role'> & {
+      action: ActionFunction;
+      submenus: (pie: PieMenuBuilder) => void;
+    }
+  ) {
+    const { icon, label } = node;
+    this.beginSubmenu({ icon, label }, node.action);
+    node.submenus(this);
+    this.endSubmenu();
+  }
+
   reset(base: PieBuilderConstructorProps) {
     this._stack = [];
     this._schema = {
@@ -142,44 +182,5 @@ export class PieMenuBuilder {
     };
 
     this._stack.push(this._schema.root);
-  }
-
-  private _computeAngles(node: PieNodeModel) {
-    if (
-      !isNodeWithChildren(node) ||
-      !node.children ||
-      node.children.length === 0
-    ) {
-      return;
-    }
-    const parentAngle =
-      node.angle == undefined ? undefined : (node.angle + 180) % 360;
-    const angles = calcNodeAngles(node.children, parentAngle);
-    const wedges = calcNodeWedges(angles, parentAngle);
-
-    for (let i = 0; i < node.children.length; ++i) {
-      const child = node.children[i];
-      child.angle = angles[i];
-      child.startAngle = wedges[i].start;
-      child.endAngle = wedges[i].end;
-
-      this._computeAngles(child);
-    }
-  }
-
-  build() {
-    const schema = this._schema;
-    assertExists(schema);
-    this._computeAngles(schema.root);
-
-    this._schema = null;
-    this._stack = [];
-    return schema;
-  }
-
-  private _currentNode(): PieNodeModel {
-    const node = this._stack[this._stack.length - 1];
-    assertExists(node, 'No node active');
-    return node;
   }
 }

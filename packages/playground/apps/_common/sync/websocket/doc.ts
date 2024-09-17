@@ -1,13 +1,44 @@
-import { assertExists } from '@blocksuite/global/utils';
 import type { DocSource } from '@blocksuite/sync';
+
+import { assertExists } from '@blocksuite/global/utils';
 import { diffUpdate, encodeStateVectorFromUpdate, mergeUpdates } from 'yjs';
 
 import type { WebSocketMessage } from './types';
 
 export class WebSocketDocSource implements DocSource {
-  name = 'websocket';
+  private _onMessage = (event: MessageEvent<string>) => {
+    const data = JSON.parse(event.data) as WebSocketMessage;
+
+    if (data.channel !== 'doc') return;
+
+    if (data.payload.type === 'init') {
+      for (const [docId, data] of this.docMap) {
+        this.ws.send(
+          JSON.stringify({
+            channel: 'doc',
+            payload: {
+              type: 'update',
+              docId,
+              updates: Array.from(data),
+            },
+          } satisfies WebSocketMessage)
+        );
+      }
+      return;
+    }
+
+    const { docId, updates } = data.payload;
+    const update = this.docMap.get(docId);
+    if (update) {
+      this.docMap.set(docId, mergeUpdates([update, new Uint8Array(updates)]));
+    } else {
+      this.docMap.set(docId, new Uint8Array(updates));
+    }
+  };
 
   docMap = new Map<string, Uint8Array>();
+
+  name = 'websocket';
 
   constructor(readonly ws: WebSocket) {
     this.ws.addEventListener('message', this._onMessage);
@@ -70,34 +101,4 @@ export class WebSocketDocSource implements DocSource {
       abortController.abort();
     };
   }
-
-  private _onMessage = (event: MessageEvent<string>) => {
-    const data = JSON.parse(event.data) as WebSocketMessage;
-
-    if (data.channel !== 'doc') return;
-
-    if (data.payload.type === 'init') {
-      for (const [docId, data] of this.docMap) {
-        this.ws.send(
-          JSON.stringify({
-            channel: 'doc',
-            payload: {
-              type: 'update',
-              docId,
-              updates: Array.from(data),
-            },
-          } satisfies WebSocketMessage)
-        );
-      }
-      return;
-    }
-
-    const { docId, updates } = data.payload;
-    const update = this.docMap.get(docId);
-    if (update) {
-      this.docMap.set(docId, mergeUpdates([update, new Uint8Array(updates)]));
-    } else {
-      this.docMap.set(docId, new Uint8Array(updates));
-    }
-  };
 }

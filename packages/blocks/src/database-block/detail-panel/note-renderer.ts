@@ -1,16 +1,18 @@
 import type { EditorHost } from '@blocksuite/block-std';
+
 import { ShadowlessElement, WithDisposable } from '@blocksuite/block-std';
 import { css, html } from 'lit';
 import { customElement, property, query } from 'lit/decorators.js';
+
+import type { DetailSlotProps } from '../data-view/common/data-source/base.js';
+import type { SingleView } from '../data-view/view-manager/single-view.js';
+import type { DatabaseBlockModel } from '../database-model.js';
 
 import {
   asyncFocusRichText,
   createDefaultDoc,
   matchFlavours,
 } from '../../_common/utils/index.js';
-import type { DetailSlotProps } from '../data-view/common/data-source/base.js';
-import type { DataViewManager } from '../data-view/view/data-view-manager.js';
-import type { DatabaseBlockModel } from '../database-model.js';
 
 @customElement('database-datasource-note-renderer')
 export class NoteRenderer
@@ -21,33 +23,11 @@ export class NoteRenderer
     database-datasource-note-renderer {
       width: 100%;
       --affine-editor-side-padding: 0;
+      flex: 1;
     }
   `;
-  @property({ attribute: false })
-  accessor view!: DataViewManager;
-  @property({ attribute: false })
-  accessor rowId!: string;
-  @property({ attribute: false })
-  accessor model!: DatabaseBlockModel;
-  @property({ attribute: false })
-  accessor host!: EditorHost;
-  @query('editor-host')
-  accessor subHost!: EditorHost;
 
-  get databaseBlock(): DatabaseBlockModel {
-    return this.model;
-  }
-
-  public override connectedCallback() {
-    super.connectedCallback();
-    this.databaseBlock.propsUpdated.on(({ key }) => {
-      if (key === 'notes') {
-        this.requestUpdate();
-      }
-    });
-  }
-
-  public addNote() {
+  addNote() {
     const collection = this.host?.std.collection;
     if (!collection) {
       return;
@@ -76,12 +56,30 @@ export class NoteRenderer
     }
   }
 
+  override connectedCallback() {
+    super.connectedCallback();
+    this.databaseBlock.propsUpdated.on(({ key }) => {
+      if (key === 'notes') {
+        this.requestUpdate();
+      }
+    });
+  }
+
   protected override render(): unknown {
     if (
       !this.model.doc.awarenessStore.getFlag('enable_database_attachment_note')
     ) {
       return null;
     }
+    return html`
+      <div
+        style="height: 1px;max-width: var(--affine-editor-width);background-color: var(--affine-border-color);margin: auto;margin-bottom: 16px"
+      ></div>
+      ${this.renderNote()}
+    `;
+  }
+
+  renderNote() {
     const host = this.host;
     const std = host?.std;
     if (!std || !host) {
@@ -89,7 +87,14 @@ export class NoteRenderer
     }
     const pageId = this.databaseBlock.notes?.[this.rowId];
     if (!pageId) {
-      return html` <div @click="${this.addNote}">Click to add note</div>`;
+      return html` <div>
+        <div
+          @click="${this.addNote}"
+          style="max-width: var(--affine-editor-width);margin: auto;cursor: pointer;color: var(--affine-text-disable-color)"
+        >
+          Click to add note
+        </div>
+      </div>`;
     }
     const page = std.collection.getDoc(pageId);
     if (!page) {
@@ -97,4 +102,23 @@ export class NoteRenderer
     }
     return html`${host.renderSpecPortal(page, host.specs)} `;
   }
+
+  get databaseBlock(): DatabaseBlockModel {
+    return this.model;
+  }
+
+  @property({ attribute: false })
+  accessor host!: EditorHost;
+
+  @property({ attribute: false })
+  accessor model!: DatabaseBlockModel;
+
+  @property({ attribute: false })
+  accessor rowId!: string;
+
+  @query('editor-host')
+  accessor subHost!: EditorHost;
+
+  @property({ attribute: false })
+  accessor view!: SingleView;
 }

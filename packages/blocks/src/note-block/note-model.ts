@@ -1,32 +1,32 @@
+import type { GfxElementGeometry } from '@blocksuite/block-std/gfx';
+import type { SerializedXYWH } from '@blocksuite/global/utils';
+
+import { Bound } from '@blocksuite/global/utils';
 import { BlockModel, defineBlockSchema } from '@blocksuite/store';
 
 import { NOTE_WIDTH } from '../_common/consts.js';
-import { selectable } from '../_common/edgeless/mixin/edgeless-selectable.js';
+import { GfxCompatible } from '../_common/edgeless/mixin/gfx-compatible.js';
 import {
-  DEFAULT_NOTE_COLOR,
-  NOTE_SHADOWS,
+  DEFAULT_NOTE_BACKGROUND_COLOR,
+  DEFAULT_NOTE_SHADOW,
 } from '../_common/edgeless/note/consts.js';
 import { NoteDisplayMode } from '../_common/types.js';
-import {
-  Bound,
-  type SerializedXYWH,
-  StrokeStyle,
-} from '../surface-block/index.js';
+import { type Color, StrokeStyle } from '../surface-block/consts.js';
 
 export const NoteBlockSchema = defineBlockSchema({
   flavour: 'affine:note',
   props: (): NoteProps => ({
     xywh: `[0,0,${NOTE_WIDTH},95]`,
-    background: DEFAULT_NOTE_COLOR,
+    background: DEFAULT_NOTE_BACKGROUND_COLOR,
     index: 'a0',
     hidden: false,
     displayMode: NoteDisplayMode.DocAndEdgeless,
     edgeless: {
       style: {
-        borderRadius: 8,
+        borderRadius: 0,
         borderSize: 4,
-        borderStyle: StrokeStyle.Solid,
-        shadowType: NOTE_SHADOWS[1],
+        borderStyle: StrokeStyle.None,
+        shadowType: DEFAULT_NOTE_SHADOW,
       },
     },
   }),
@@ -42,7 +42,6 @@ export const NoteBlockSchema = defineBlockSchema({
       'affine:database',
       'affine:data-view',
       'affine:image',
-      'affine:note-block-*',
       'affine:bookmark',
       'affine:attachment',
       'affine:surface-ref',
@@ -56,7 +55,7 @@ export const NoteBlockSchema = defineBlockSchema({
 
 type NoteProps = {
   xywh: SerializedXYWH;
-  background: string;
+  background: Color;
   index: string;
   displayMode: NoteDisplayMode;
   edgeless: NoteEdgelessProps;
@@ -83,26 +82,29 @@ type NoteEdgelessProps = {
   scale?: number;
 };
 
-export class NoteBlockModel extends selectable<NoteProps>(BlockModel) {
+export class NoteBlockModel
+  extends GfxCompatible<NoteProps>(BlockModel)
+  implements GfxElementGeometry
+{
   private _isSelectable(): boolean {
     return this.displayMode !== NoteDisplayMode.DocOnly;
   }
 
-  override hitTest(x: number, y: number): boolean {
+  override containsBound(bounds: Bound): boolean {
+    if (!this._isSelectable()) return false;
+    return super.containsBound(bounds);
+  }
+
+  override includesPoint(x: number, y: number): boolean {
     if (!this._isSelectable()) return false;
 
     const bound = Bound.deserialize(this.xywh);
     return bound.isPointInBound([x, y], 0);
   }
 
-  override containedByBounds(bounds: Bound): boolean {
+  override intersectsBound(bound: Bound): boolean {
     if (!this._isSelectable()) return false;
-    return super.containedByBounds(bounds);
-  }
-
-  override boxSelect(bound: Bound): boolean {
-    if (!this._isSelectable()) return false;
-    return super.boxSelect(bound);
+    return super.intersectsBound(bound);
   }
 }
 

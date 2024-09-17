@@ -1,18 +1,18 @@
-import '../../../filter/filter-group.js';
-
 import { baseTheme } from '@toeverything/theme';
 import { css, html, unsafeCSS } from 'lit';
 import { customElement, query, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
+import type { KanbanSingleView } from '../../../../view/presets/kanban/kanban-view-manager.js';
+import type { TableSingleView } from '../../../../view/presets/table/table-view-manager.js';
+
 import {
   DatabaseSearchClose,
   DatabaseSearchIcon,
 } from '../../../../common/icons/index.js';
 import { stopPropagation } from '../../../../utils/event.js';
-import type { DataViewKanbanManager } from '../../../../view/presets/kanban/kanban-view-manager.js';
-import type { DataViewTableManager } from '../../../../view/presets/table/table-view-manager.js';
+import '../../../filter/filter-group.js';
 import { WidgetBase } from '../../../widget-base.js';
 
 const styles = css`
@@ -95,34 +95,26 @@ const styles = css`
 
 @customElement('data-view-header-tools-search')
 export class DataViewHeaderToolsSearch extends WidgetBase {
-  public override accessor view!: DataViewTableManager | DataViewKanbanManager;
+  private _clearSearch = () => {
+    this._searchInput.value = '';
+    this.view.setSearch('');
+    this.preventBlur = true;
+    setTimeout(() => {
+      this.preventBlur = false;
+    });
+  };
 
-  get showSearch(): boolean {
-    return this._showSearch;
-  }
-
-  set showSearch(value: boolean) {
-    this._showSearch = value;
-    const tools = this.closest('data-view-header-tools');
-    if (tools) {
-      tools.showToolBar = value;
-    }
-  }
-
-  static override styles = styles;
-
-  @query('.affine-database-search-input')
-  private accessor _searchInput!: HTMLInputElement;
-
-  @state()
-  private accessor _showSearch = false;
+  private _clickSearch = (e: MouseEvent) => {
+    e.stopPropagation();
+    this.showSearch = true;
+  };
 
   private _onSearch = (event: InputEvent) => {
     const el = event.target as HTMLInputElement;
     const inputValue = el.value.trim();
     this.view.setSearch(inputValue);
   };
-  preventBlur = false;
+
   private _onSearchBlur = () => {
     if (this._searchInput.value || this.preventBlur) {
       return;
@@ -141,19 +133,9 @@ export class DataViewHeaderToolsSearch extends WidgetBase {
     }
   };
 
-  private _clearSearch = () => {
-    this._searchInput.value = '';
-    this.view.setSearch('');
-    this.preventBlur = true;
-    setTimeout(() => {
-      this.preventBlur = false;
-    });
-  };
+  static override styles = styles;
 
-  private _clickSearch = (e: MouseEvent) => {
-    e.stopPropagation();
-    this.showSearch = true;
-  };
+  preventBlur = false;
 
   override render() {
     const searchToolClassMap = classMap({
@@ -194,6 +176,26 @@ export class DataViewHeaderToolsSearch extends WidgetBase {
       </label>
     `;
   }
+
+  get showSearch(): boolean {
+    return this._showSearch;
+  }
+
+  set showSearch(value: boolean) {
+    this._showSearch = value;
+    const tools = this.closest('data-view-header-tools');
+    if (tools) {
+      tools.showToolBar = value;
+    }
+  }
+
+  @query('.affine-database-search-input')
+  private accessor _searchInput!: HTMLInputElement;
+
+  @state()
+  private accessor _showSearch = false;
+
+  public override accessor view!: TableSingleView | KanbanSingleView;
 }
 
 declare global {

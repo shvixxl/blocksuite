@@ -1,4 +1,4 @@
-import { defineBlockSchema, type SchemaToModel } from '@blocksuite/store';
+import { type SchemaToModel, defineBlockSchema } from '@blocksuite/store';
 
 export type ParagraphType =
   | 'text'
@@ -24,6 +24,7 @@ export const ParagraphBlockSchema = defineBlockSchema({
       'affine:database',
       'affine:paragraph',
       'affine:list',
+      'affine:edgeless-text',
     ],
   },
 });

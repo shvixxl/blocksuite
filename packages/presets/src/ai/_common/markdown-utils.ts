@@ -1,8 +1,9 @@
 import type { EditorHost } from '@blocksuite/block-std';
+import type { BlockModel } from '@blocksuite/store';
+
 import { MarkdownAdapter } from '@blocksuite/blocks';
 import { titleMiddleware } from '@blocksuite/blocks';
 import { assertExists } from '@blocksuite/global/utils';
-import type { BlockModel } from '@blocksuite/store';
 import { Job, type Slice } from '@blocksuite/store';
 
 export async function getMarkdownFromSlice(host: EditorHost, slice: Slice) {
@@ -10,13 +11,11 @@ export async function getMarkdownFromSlice(host: EditorHost, slice: Slice) {
     collection: host.std.doc.collection,
     middlewares: [titleMiddleware],
   });
-  const snapshot = await job.sliceToSnapshot(slice);
-  const markdownAdapter = new MarkdownAdapter();
-  markdownAdapter.applyConfigs(job.adapterConfigs);
-  const markdown = await markdownAdapter.fromSliceSnapshot({
-    snapshot,
-    assets: job.assetsManager,
-  });
+  const markdownAdapter = new MarkdownAdapter(job);
+  const markdown = await markdownAdapter.fromSlice(slice);
+  if (!markdown) {
+    return '';
+  }
 
   return markdown.file;
 }
@@ -25,7 +24,7 @@ export const markdownToSnapshot = async (
   host: EditorHost
 ) => {
   const job = new Job({ collection: host.std.doc.collection });
-  const markdownAdapter = new MarkdownAdapter();
+  const markdownAdapter = new MarkdownAdapter(job);
   const { blockVersions, workspaceVersion, pageVersion } =
     host.std.doc.collection.meta;
   if (!blockVersions || !workspaceVersion || !pageVersion)
@@ -70,7 +69,9 @@ export async function insertFromMarkdown(
       parent,
       (index ?? 0) + i
     );
-    models.push(model);
+    if (model) {
+      models.push(model);
+    }
   }
 
   return models;

@@ -1,8 +1,10 @@
-import { ShadowlessElement, WithDisposable } from '@blocksuite/block-std';
+import type { EditorHost } from '@blocksuite/block-std';
 import type { RichText } from '@blocksuite/blocks';
-import { type RootBlockModel } from '@blocksuite/blocks';
-import { assertExists } from '@blocksuite/global/utils';
+import type { RootBlockModel } from '@blocksuite/blocks';
 import type { Doc } from '@blocksuite/store';
+
+import { ShadowlessElement, WithDisposable } from '@blocksuite/block-std';
+import { assertExists } from '@blocksuite/global/utils';
 import { css, html } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 
@@ -10,6 +12,34 @@ const DOC_BLOCK_CHILD_PADDING = 24;
 
 @customElement('doc-title')
 export class DocTitle extends WithDisposable(ShadowlessElement) {
+  private _onTitleKeyDown = (event: KeyboardEvent) => {
+    if (event.isComposing || this.doc.readonly) return;
+    const hasContent = !this.doc.isEmpty;
+
+    if (event.key === 'Enter' && hasContent && !event.isComposing) {
+      event.preventDefault();
+
+      const inlineEditor = this._inlineEditor;
+      assertExists(inlineEditor);
+      const inlineRange = inlineEditor.getInlineRange();
+      assertExists(inlineRange);
+
+      const rightText = this._rootModel.title.split(inlineRange.index);
+      this._pageRoot.prependParagraphWithText(rightText);
+    } else if (event.key === 'ArrowDown' && hasContent) {
+      event.preventDefault();
+      this._pageRoot.focusFirstParagraph();
+    } else if (event.key === 'Tab') {
+      event.preventDefault();
+    }
+  };
+
+  private _updateTitleInMeta = () => {
+    this.doc.collection.setDocMeta(this.doc.id, {
+      title: this._rootModel.title.toString(),
+    });
+  };
+
   static override styles = css`
     .doc-title-container {
       box-sizing: border-box;
@@ -60,30 +90,8 @@ export class DocTitle extends WithDisposable(ShadowlessElement) {
     }
   `;
 
-  @property({ attribute: false })
-  accessor doc!: Doc;
-
-  @state()
-  private accessor _isReadonly = false;
-
-  @state()
-  private accessor _isComposing = false;
-
-  @query('rich-text')
-  private accessor _richTextElement!: RichText;
-
-  private get _rootModel() {
-    return this.doc.root as RootBlockModel;
-  }
-
   private get _inlineEditor() {
     return this._richTextElement.inlineEditor;
-  }
-
-  private get _viewport() {
-    const el = this.closest<HTMLElement>('.affine-page-viewport');
-    assertExists(el);
-    return el;
   }
 
   private get _pageRoot() {
@@ -92,33 +100,15 @@ export class DocTitle extends WithDisposable(ShadowlessElement) {
     return pageRoot;
   }
 
-  private _onTitleKeyDown = (event: KeyboardEvent) => {
-    if (event.isComposing || this.doc.readonly) return;
-    const hasContent = !this.doc.isEmpty;
+  private get _rootModel() {
+    return this.doc.root as RootBlockModel;
+  }
 
-    if (event.key === 'Enter' && hasContent && !event.isComposing) {
-      event.preventDefault();
-
-      const inlineEditor = this._inlineEditor;
-      assertExists(inlineEditor);
-      const inlineRange = inlineEditor.getInlineRange();
-      assertExists(inlineRange);
-
-      const rightText = this._rootModel.title.split(inlineRange.index);
-      this._pageRoot.prependParagraphWithText(rightText);
-    } else if (event.key === 'ArrowDown' && hasContent) {
-      event.preventDefault();
-      this._pageRoot.focusFirstParagraph();
-    } else if (event.key === 'Tab') {
-      event.preventDefault();
-    }
-  };
-
-  private _updateTitleInMeta = () => {
-    this.doc.collection.setDocMeta(this.doc.id, {
-      title: this._rootModel.title.toString(),
-    });
-  };
+  private get _viewport() {
+    const el = this.closest<HTMLElement>('.affine-page-viewport');
+    assertExists(el);
+    return el;
+  }
 
   override connectedCallback() {
     super.connectedCallback();
@@ -178,6 +168,26 @@ export class DocTitle extends WithDisposable(ShadowlessElement) {
       </div>
     `;
   }
+
+  @state()
+  private accessor _isComposing = false;
+
+  @state()
+  private accessor _isReadonly = false;
+
+  @query('rich-text')
+  private accessor _richTextElement!: RichText;
+
+  @property({ attribute: false })
+  accessor doc!: Doc;
+}
+
+export function getDocTitleByEditorHost(
+  editorHost: EditorHost
+): DocTitle | null {
+  const docViewport = editorHost.closest('.affine-page-viewport');
+  if (!docViewport) return null;
+  return docViewport.querySelector('doc-title');
 }
 
 declare global {

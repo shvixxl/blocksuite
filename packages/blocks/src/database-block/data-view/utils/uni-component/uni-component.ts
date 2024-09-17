@@ -1,8 +1,10 @@
-import { ShadowlessElement } from '@blocksuite/block-std';
 import type { LitElement, PropertyValues, TemplateResult } from 'lit';
+import type { Ref } from 'lit/directives/ref.js';
+
+import { ShadowlessElement } from '@blocksuite/block-std';
+import { SignalWatcher } from '@lit-labs/preact-signals';
 import { css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import type { Ref } from 'lit/directives/ref.js';
 import { type StyleInfo, styleMap } from 'lit/directives/style-map.js';
 
 export type UniComponentReturn<
@@ -19,7 +21,7 @@ export type UniComponent<
 > = (ele: HTMLElement, props: Props) => UniComponentReturn<Props, Expose>;
 export const renderUniLit = <Props, Expose extends NonNullable<unknown>>(
   uni: UniComponent<Props, Expose> | undefined,
-  props: Props,
+  props?: Props,
   options?: {
     ref?: Ref<Expose>;
     style?: Readonly<StyleInfo>;
@@ -44,19 +46,8 @@ export class UniLit<
       display: contents;
     }
   `;
-  @property({ attribute: false })
-  accessor uni: UniComponent<Props, Expose> | undefined = undefined;
-
-  @property({ attribute: false })
-  accessor props!: Props;
-  @property({ attribute: false })
-  accessor ref: Ref<Expose> | undefined = undefined;
 
   uniReturn?: UniComponentReturn<Props, Expose>;
-
-  get expose(): Expose | undefined {
-    return this.uniReturn?.expose;
-  }
 
   private mount() {
     this.uniReturn = this.uni?.(this, this.props);
@@ -80,6 +71,10 @@ export class UniLit<
     this.unmount();
   }
 
+  protected override render(): unknown {
+    return html``;
+  }
+
   protected override updated(_changedProperties: PropertyValues) {
     super.updated(_changedProperties);
     if (_changedProperties.has('uni')) {
@@ -90,9 +85,18 @@ export class UniLit<
     }
   }
 
-  protected override render(): unknown {
-    return html``;
+  get expose(): Expose | undefined {
+    return this.uniReturn?.expose;
   }
+
+  @property({ attribute: false })
+  accessor props!: Props;
+
+  @property({ attribute: false })
+  accessor ref: Ref<Expose> | undefined = undefined;
+
+  @property({ attribute: false })
+  accessor uni: UniComponent<Props, Expose> | undefined = undefined;
 }
 
 export const createUniComponentFromWebComponent = <
@@ -108,6 +112,7 @@ export const createUniComponentFromWebComponent = <
     return {
       update: props => {
         Object.assign(ins, props);
+        ins.requestUpdate();
       },
       unmount: () => {
         ins.remove();
@@ -121,17 +126,19 @@ export const createUniComponentFromWebComponent = <
 class UniAnyRender<
   T,
   Expose extends NonNullable<unknown>,
-> extends ShadowlessElement {
-  @property({ attribute: false })
-  accessor props!: T;
-  @property({ attribute: false })
-  accessor expose!: Expose;
-  @property({ attribute: false })
-  accessor renderTemplate!: (props: T, expose: Expose) => TemplateResult;
-
+> extends SignalWatcher(ShadowlessElement) {
   override render() {
     return this.renderTemplate(this.props, this.expose);
   }
+
+  @property({ attribute: false })
+  accessor expose!: Expose;
+
+  @property({ attribute: false })
+  accessor props!: T;
+
+  @property({ attribute: false })
+  accessor renderTemplate!: (props: T, expose: Expose) => TemplateResult;
 }
 export const defineUniComponent = <T, Expose extends NonNullable<unknown>>(
   renderTemplate: (props: T, expose: Expose) => TemplateResult
@@ -145,6 +152,7 @@ export const defineUniComponent = <T, Expose extends NonNullable<unknown>>(
     return {
       update: props => {
         ins.props = props;
+        ins.requestUpdate();
       },
       unmount: () => {
         ins.remove();

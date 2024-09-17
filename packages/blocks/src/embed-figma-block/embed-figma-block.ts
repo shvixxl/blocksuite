@@ -1,42 +1,38 @@
-import { assertExists } from '@blocksuite/global/utils';
-import { html, nothing } from 'lit';
+import { html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 
-import { EMBED_CARD_HEIGHT, EMBED_CARD_WIDTH } from '../_common/consts.js';
-import { EmbedBlockElement } from '../_common/embed-block-helper/embed-block-element.js';
-import { OpenIcon } from '../_common/icons/text.js';
 import type { EmbedFigmaStyles } from './embed-figma-model.js';
-import { type EmbedFigmaModel } from './embed-figma-model.js';
+import type { EmbedFigmaModel } from './embed-figma-model.js';
 import type { EmbedFigmaBlockService } from './embed-figma-service.js';
+
+import { EMBED_CARD_HEIGHT, EMBED_CARD_WIDTH } from '../_common/consts.js';
+import { EmbedBlockComponent } from '../_common/embed-block-helper/embed-block-element.js';
+import { OpenIcon } from '../_common/icons/text.js';
 import { FigmaIcon, styles } from './styles.js';
 
 @customElement('affine-embed-figma-block')
-export class EmbedFigmaBlockComponent extends EmbedBlockElement<
+export class EmbedFigmaBlockComponent extends EmbedBlockComponent<
   EmbedFigmaModel,
   EmbedFigmaBlockService
 > {
-  static override styles = styles;
-
   override _cardStyle: (typeof EmbedFigmaStyles)[number] = 'figma';
-
-  @state()
-  private accessor _isSelected = false;
-
-  @state()
-  private accessor _showOverlay = true;
 
   private _isDragging = false;
 
   private _isResizing = false;
 
-  private _selectBlock() {
-    const selectionManager = this.host.selection;
-    const blockSelection = selectionManager.create('block', {
-      blockId: this.blockId,
-    });
-    selectionManager.setGroup('note', [blockSelection]);
-  }
+  static override styles = styles;
+
+  open = () => {
+    let link = this.model.url;
+    if (!link.match(/^[a-zA-Z]+:\/\//)) {
+      link = 'https://' + link;
+    }
+    window.open(link, '_blank');
+  };
+
+  refreshData = () => {};
 
   private _handleClick(event: MouseEvent) {
     event.stopPropagation();
@@ -50,15 +46,13 @@ export class EmbedFigmaBlockComponent extends EmbedBlockElement<
     this.open();
   }
 
-  open = () => {
-    let link = this.model.url;
-    if (!link.match(/^[a-zA-Z]+:\/\//)) {
-      link = 'https://' + link;
-    }
-    window.open(link, '_blank');
-  };
-
-  refreshData = () => {};
+  private _selectBlock() {
+    const selectionManager = this.host.selection;
+    const blockSelection = selectionManager.create('block', {
+      blockId: this.blockId,
+    });
+    selectionManager.setGroup('note', [blockSelection]);
+  }
 
   override connectedCallback() {
     super.connectedCallback();
@@ -91,27 +85,31 @@ export class EmbedFigmaBlockComponent extends EmbedBlockElement<
       })
     );
     // this is required to prevent iframe from capturing pointer events
-    this.handleEvent('pointerMove', ctx => {
-      this._isDragging = ctx.get('pointerState').dragging;
+    this.handleEvent('dragStart', () => {
+      this._isDragging = true;
+      this._showOverlay =
+        this._isResizing || this._isDragging || !this._isSelected;
+    });
+
+    this.handleEvent('dragEnd', () => {
+      this._isDragging = false;
       this._showOverlay =
         this._isResizing || this._isDragging || !this._isSelected;
     });
 
     if (this.isInSurface) {
-      const surface = this.surface;
-      assertExists(surface);
       this.disposables.add(
         this.model.propsUpdated.on(() => {
           this.requestUpdate();
         })
       );
 
-      this.edgeless?.slots.elementResizeStart.on(() => {
+      this.rootService?.slots.elementResizeStart.on(() => {
         this._isResizing = true;
         this._showOverlay = true;
       });
 
-      this.edgeless?.slots.elementResizeEnd.on(() => {
+      this.rootService?.slots.elementResizeEnd.on(() => {
         this._isResizing = false;
         this._showOverlay =
           this._isResizing || this._isDragging || !this._isSelected;
@@ -180,11 +178,15 @@ export class EmbedFigmaBlockComponent extends EmbedBlockElement<
             </div>
           </div>
         </div>
-
-        ${this.isInSurface ? nothing : Object.values(this.widgets)}
       `
     );
   }
+
+  @state()
+  private accessor _isSelected = false;
+
+  @state()
+  private accessor _showOverlay = true;
 }
 
 declare global {

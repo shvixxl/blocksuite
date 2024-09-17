@@ -1,16 +1,16 @@
-import '../../panel/one-row-color-panel.js';
-import '../../buttons/tool-icon-button.js';
-import '../common/slide-menu.js';
-
-import { WithDisposable } from '@blocksuite/block-std';
-import { css, html, LitElement, nothing } from 'lit';
+import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import type { EdgelessRootBlockComponent } from '../../../edgeless-root-block.js';
+import type { EdgelessTool } from '../../../types.js';
 import type { ColorEvent } from '../../panel/color-panel.js';
 
+import '../../buttons/tool-icon-button.js';
+import '../../panel/one-row-color-panel.js';
+import '../common/slide-menu.js';
+import { EdgelessToolbarToolMixin } from '../mixins/tool.mixin.js';
+
 @customElement('edgeless-text-menu')
-export class EdgelessTextMenu extends WithDisposable(LitElement) {
+export class EdgelessTextMenu extends EdgelessToolbarToolMixin(LitElement) {
   static override styles = css`
     :host {
       display: flex;
@@ -19,20 +19,13 @@ export class EdgelessTextMenu extends WithDisposable(LitElement) {
     }
   `;
 
-  @property({ attribute: false })
-  accessor edgeless!: EdgelessRootBlockComponent;
-
-  @property({ attribute: false })
-  accessor color!: string;
-
-  @property({ attribute: false })
-  accessor onChange!: (props: Record<string, unknown>) => void;
+  override type: EdgelessTool['type'] = 'text';
 
   override render() {
-    if (this.edgeless.edgelessTool.type !== 'text') return nothing;
+    if (this.edgelessTool.type !== 'text') return nothing;
 
     return html`
-      <edgeless-slide-menu .menuWidth=${476}>
+      <edgeless-slide-menu>
         <div class="menu-content">
           <edgeless-one-row-color-panel
             .value=${this.color}
@@ -42,6 +35,12 @@ export class EdgelessTextMenu extends WithDisposable(LitElement) {
       </edgeless-slide-menu>
     `;
   }
+
+  @property({ attribute: false })
+  accessor color!: string;
+
+  @property({ attribute: false })
+  accessor onChange!: (props: Record<string, unknown>) => void;
 }
 
 declare global {

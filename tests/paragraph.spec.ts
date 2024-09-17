@@ -1,7 +1,9 @@
 import { expect } from '@playwright/test';
 
 import {
+  SHORT_KEY,
   captureHistory,
+  dragBetweenIndices,
   dragOverTitle,
   enterPlaygroundRoom,
   focusRichText,
@@ -441,15 +443,15 @@ test('should indent and unindent works with children', async ({ page }) => {
     page,
     `
 <affine:note
-  prop:background="--affine-background-secondary-color"
+  prop:background="--affine-note-background-blue"
   prop:displayMode="both"
   prop:edgeless={
     Object {
       "style": Object {
-        "borderRadius": 8,
+        "borderRadius": 0,
         "borderSize": 4,
-        "borderStyle": "solid",
-        "shadowType": "--affine-note-shadow-box",
+        "borderStyle": "none",
+        "shadowType": "--affine-note-shadow-sticker",
       },
     }
   }
@@ -495,15 +497,15 @@ test('should indent and unindent works with children', async ({ page }) => {
     page,
     `
 <affine:note
-  prop:background="--affine-background-secondary-color"
+  prop:background="--affine-note-background-blue"
   prop:displayMode="both"
   prop:edgeless={
     Object {
       "style": Object {
-        "borderRadius": 8,
+        "borderRadius": 0,
         "borderSize": 4,
-        "borderStyle": "solid",
-        "shadowType": "--affine-note-shadow-box",
+        "borderStyle": "none",
+        "shadowType": "--affine-note-shadow-sticker",
       },
     }
   }
@@ -548,15 +550,15 @@ test('should indent and unindent works with children', async ({ page }) => {
     page,
     `
 <affine:note
-  prop:background="--affine-background-secondary-color"
+  prop:background="--affine-note-background-blue"
   prop:displayMode="both"
   prop:edgeless={
     Object {
       "style": Object {
-        "borderRadius": 8,
+        "borderRadius": 0,
         "borderSize": 4,
-        "borderStyle": "solid",
-        "shadowType": "--affine-note-shadow-box",
+        "borderStyle": "none",
+        "shadowType": "--affine-note-shadow-sticker",
       },
     }
   }
@@ -601,15 +603,15 @@ test('should indent and unindent works with children', async ({ page }) => {
     page,
     `
 <affine:note
-  prop:background="--affine-background-secondary-color"
+  prop:background="--affine-note-background-blue"
   prop:displayMode="both"
   prop:edgeless={
     Object {
       "style": Object {
-        "borderRadius": 8,
+        "borderRadius": 0,
         "borderSize": 4,
-        "borderStyle": "solid",
-        "shadowType": "--affine-note-shadow-box",
+        "borderStyle": "none",
+        "shadowType": "--affine-note-shadow-sticker",
       },
     }
   }
@@ -655,15 +657,15 @@ test('should indent and unindent works with children', async ({ page }) => {
     page,
     `
 <affine:note
-  prop:background="--affine-background-secondary-color"
+  prop:background="--affine-note-background-blue"
   prop:displayMode="both"
   prop:edgeless={
     Object {
       "style": Object {
-        "borderRadius": 8,
+        "borderRadius": 0,
         "borderSize": 4,
-        "borderStyle": "solid",
-        "shadowType": "--affine-note-shadow-box",
+        "borderStyle": "none",
+        "shadowType": "--affine-note-shadow-sticker",
       },
     }
   }
@@ -712,15 +714,15 @@ test('should indent and unindent works with children', async ({ page }) => {
     page,
     `
 <affine:note
-  prop:background="--affine-background-secondary-color"
+  prop:background="--affine-note-background-blue"
   prop:displayMode="both"
   prop:edgeless={
     Object {
       "style": Object {
-        "borderRadius": 8,
+        "borderRadius": 0,
         "borderSize": 4,
-        "borderStyle": "solid",
-        "shadowType": "--affine-note-shadow-box",
+        "borderStyle": "none",
+        "shadowType": "--affine-note-shadow-sticker",
       },
     }
   }
@@ -766,15 +768,15 @@ test('should indent and unindent works with children', async ({ page }) => {
     page,
     `
 <affine:note
-  prop:background="--affine-background-secondary-color"
+  prop:background="--affine-note-background-blue"
   prop:displayMode="both"
   prop:edgeless={
     Object {
       "style": Object {
-        "borderRadius": 8,
+        "borderRadius": 0,
         "borderSize": 4,
-        "borderStyle": "solid",
-        "shadowType": "--affine-note-shadow-box",
+        "borderStyle": "none",
+        "shadowType": "--affine-note-shadow-sticker",
       },
     }
   }
@@ -829,15 +831,15 @@ test('should indent and unindent works with children', async ({ page }) => {
     page,
     `
 <affine:note
-  prop:background="--affine-background-secondary-color"
+  prop:background="--affine-note-background-blue"
   prop:displayMode="both"
   prop:edgeless={
     Object {
       "style": Object {
-        "borderRadius": 8,
+        "borderRadius": 0,
         "borderSize": 4,
-        "borderStyle": "solid",
-        "shadowType": "--affine-note-shadow-box",
+        "borderStyle": "none",
+        "shadowType": "--affine-note-shadow-sticker",
       },
     }
   }
@@ -883,15 +885,15 @@ test('paragraph with child block should work at enter', async ({ page }) => {
     page,
     `
 <affine:note
-  prop:background="--affine-background-secondary-color"
+  prop:background="--affine-note-background-blue"
   prop:displayMode="both"
   prop:edgeless={
     Object {
       "style": Object {
-        "borderRadius": 8,
+        "borderRadius": 0,
         "borderSize": 4,
-        "borderStyle": "solid",
-        "shadowType": "--affine-note-shadow-box",
+        "borderStyle": "none",
+        "shadowType": "--affine-note-shadow-sticker",
       },
     }
   }
@@ -917,15 +919,15 @@ test('paragraph with child block should work at enter', async ({ page }) => {
     page,
     `
 <affine:note
-  prop:background="--affine-background-secondary-color"
+  prop:background="--affine-note-background-blue"
   prop:displayMode="both"
   prop:edgeless={
     Object {
       "style": Object {
-        "borderRadius": 8,
+        "borderRadius": 0,
         "borderSize": 4,
-        "borderStyle": "solid",
-        "shadowType": "--affine-note-shadow-box",
+        "borderStyle": "none",
+        "shadowType": "--affine-note-shadow-sticker",
       },
     }
   }
@@ -935,11 +937,11 @@ test('paragraph with child block should work at enter', async ({ page }) => {
   <affine:paragraph
     prop:text="123"
     prop:type="text"
-  />
-  <affine:paragraph
-    prop:text="789"
-    prop:type="text"
   >
+    <affine:paragraph
+      prop:text="789"
+      prop:type="text"
+    />
     <affine:paragraph
       prop:text="456"
       prop:type="text"
@@ -965,15 +967,15 @@ test('should delete paragraph block child can hold cursor in correct position', 
     page,
     `
 <affine:note
-  prop:background="--affine-background-secondary-color"
+  prop:background="--affine-note-background-blue"
   prop:displayMode="both"
   prop:edgeless={
     Object {
       "style": Object {
-        "borderRadius": 8,
+        "borderRadius": 0,
         "borderSize": 4,
-        "borderStyle": "solid",
-        "shadowType": "--affine-note-shadow-box",
+        "borderStyle": "none",
+        "shadowType": "--affine-note-shadow-sticker",
       },
     }
   }
@@ -1001,15 +1003,15 @@ test('should delete paragraph block child can hold cursor in correct position', 
     page,
     `
 <affine:note
-  prop:background="--affine-background-secondary-color"
+  prop:background="--affine-note-background-blue"
   prop:displayMode="both"
   prop:edgeless={
     Object {
       "style": Object {
-        "borderRadius": 8,
+        "borderRadius": 0,
         "borderSize": 4,
-        "borderStyle": "solid",
-        "shadowType": "--affine-note-shadow-box",
+        "borderStyle": "none",
+        "shadowType": "--affine-note-shadow-sticker",
       },
     }
   }
@@ -1432,24 +1434,6 @@ test('should placeholder not show when multiple blocks are selected', async ({
   await expect(placeholder).toBeHidden();
 });
 
-test('should placeholder not show at readonly mode', async ({ page }) => {
-  await enterPlaygroundRoom(page);
-  await initEmptyParagraphState(page);
-  await focusRichText(page);
-
-  await pressEnter(page);
-  await updateBlockType(page, 'affine:paragraph', 'h1');
-
-  const placeholder = page.locator('.affine-paragraph-placeholder.visible');
-
-  await switchReadonly(page);
-  await focusRichText(page, 0);
-  await expect(placeholder).toBeHidden();
-
-  await focusRichText(page, 1);
-  await expect(placeholder).toBeHidden();
-});
-
 test.describe('press ArrowDown when cursor is at the last line of a block', () => {
   test.beforeEach(async ({ page }) => {
     await enterPlaygroundRoom(page);
@@ -1530,15 +1514,15 @@ test('delete empty text paragraph block should keep children blocks when followi
     page,
     `
 <affine:note
-  prop:background="--affine-background-secondary-color"
+  prop:background="--affine-note-background-blue"
   prop:displayMode="both"
   prop:edgeless={
     Object {
       "style": Object {
-        "borderRadius": 8,
+        "borderRadius": 0,
         "borderSize": 4,
-        "borderStyle": "solid",
-        "shadowType": "--affine-note-shadow-box",
+        "borderStyle": "none",
+        "shadowType": "--affine-note-shadow-sticker",
       },
     }
   }
@@ -1573,15 +1557,15 @@ test('delete empty text paragraph block should keep children blocks when followi
     page,
     `
 <affine:note
-  prop:background="--affine-background-secondary-color"
+  prop:background="--affine-note-background-blue"
   prop:displayMode="both"
   prop:edgeless={
     Object {
       "style": Object {
-        "borderRadius": 8,
+        "borderRadius": 0,
         "borderSize": 4,
-        "borderStyle": "solid",
-        "shadowType": "--affine-note-shadow-box",
+        "borderStyle": "none",
+        "shadowType": "--affine-note-shadow-sticker",
       },
     }
   }
@@ -1646,15 +1630,15 @@ test('paragraph indent and delete in line start', async ({ page }) => {
     page,
     `
 <affine:note
-  prop:background="--affine-background-secondary-color"
+  prop:background="--affine-note-background-blue"
   prop:displayMode="both"
   prop:edgeless={
     Object {
       "style": Object {
-        "borderRadius": 8,
+        "borderRadius": 0,
         "borderSize": 4,
-        "borderStyle": "solid",
-        "shadowType": "--affine-note-shadow-box",
+        "borderStyle": "none",
+        "shadowType": "--affine-note-shadow-sticker",
       },
     }
   }
@@ -1697,15 +1681,15 @@ test('paragraph indent and delete in line start', async ({ page }) => {
     page,
     `
 <affine:note
-  prop:background="--affine-background-secondary-color"
+  prop:background="--affine-note-background-blue"
   prop:displayMode="both"
   prop:edgeless={
     Object {
       "style": Object {
-        "borderRadius": 8,
+        "borderRadius": 0,
         "borderSize": 4,
-        "borderStyle": "solid",
-        "shadowType": "--affine-note-shadow-box",
+        "borderStyle": "none",
+        "shadowType": "--affine-note-shadow-sticker",
       },
     }
   }
@@ -1742,15 +1726,15 @@ test('paragraph indent and delete in line start', async ({ page }) => {
     page,
     `
 <affine:note
-  prop:background="--affine-background-secondary-color"
+  prop:background="--affine-note-background-blue"
   prop:displayMode="both"
   prop:edgeless={
     Object {
       "style": Object {
-        "borderRadius": 8,
+        "borderRadius": 0,
         "borderSize": 4,
-        "borderStyle": "solid",
-        "shadowType": "--affine-note-shadow-box",
+        "borderStyle": "none",
+        "shadowType": "--affine-note-shadow-sticker",
       },
     }
   }
@@ -1782,15 +1766,15 @@ test('paragraph indent and delete in line start', async ({ page }) => {
     page,
     `
 <affine:note
-  prop:background="--affine-background-secondary-color"
+  prop:background="--affine-note-background-blue"
   prop:displayMode="both"
   prop:edgeless={
     Object {
       "style": Object {
-        "borderRadius": 8,
+        "borderRadius": 0,
         "borderSize": 4,
-        "borderStyle": "solid",
-        "shadowType": "--affine-note-shadow-box",
+        "borderStyle": "none",
+        "shadowType": "--affine-note-shadow-sticker",
       },
     }
   }
@@ -1923,4 +1907,58 @@ test('select divider using delete keyboard from prev/next paragraph', async ({
   await assertDivider(page, 3);
 
   await assertRichTexts(page, ['123', '123']);
+});
+
+test.describe('readonly mode', () => {
+  test('should placeholder not show at readonly mode', async ({ page }) => {
+    await enterPlaygroundRoom(page);
+    await initEmptyParagraphState(page);
+    await focusRichText(page);
+
+    await pressEnter(page);
+    await updateBlockType(page, 'affine:paragraph', 'h1');
+
+    const placeholder = page.locator('.affine-paragraph-placeholder.visible');
+
+    await switchReadonly(page);
+    await focusRichText(page, 0);
+    await expect(placeholder).toBeHidden();
+
+    await focusRichText(page, 1);
+    await expect(placeholder).toBeHidden();
+  });
+
+  test('should readonly mode not be able to modify text', async ({ page }) => {
+    await enterPlaygroundRoom(page);
+    const { paragraphId } = await initEmptyParagraphState(page);
+
+    await focusRichText(page);
+    await type(page, 'hello');
+    await switchReadonly(page);
+
+    await pressBackspace(page, 5);
+    await type(page, 'world');
+    await dragBetweenIndices(page, [0, 1], [0, 3]);
+    await page.keyboard.press(`${SHORT_KEY}+b`);
+    await assertStoreMatchJSX(
+      page,
+      `
+<affine:paragraph
+  prop:text="hello"
+  prop:type="text"
+/>`,
+      paragraphId
+    );
+
+    await undoByKeyboard(page);
+    await assertStoreMatchJSX(
+      page,
+      `
+<affine:paragraph
+  prop:text="hello"
+  prop:type="text"
+/>`,
+      paragraphId
+    );
+  });
 });

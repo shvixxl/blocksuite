@@ -1,10 +1,19 @@
-import { html } from 'lit';
+import { type TemplateResult, html } from 'lit';
 
 import type {
   CodeBlockComponent,
   CodeBlockModel,
 } from '../../../code-block/index.js';
-import type { CodeToolbarItem, CodeToolbarMoreItem } from './types.js';
+import type {
+  CodeToolbarItem,
+  CodeToolbarMoreItem,
+  MoreItem,
+} from './types.js';
+
+import '../../../_common/components/toolbar/icon-button.js';
+import '../../../_common/components/toolbar/menu-button.js';
+import '../../../_common/components/toolbar/separator.js';
+import '../../../_common/components/tooltip/tooltip.js';
 
 export const duplicateCodeBlock = (model: CodeBlockModel) => {
   const keys = model.keys as (keyof typeof model)[];
@@ -23,7 +32,8 @@ export const duplicateCodeBlock = (model: CodeBlockModel) => {
 
 export function CodeToolbarItemRenderer(
   items: CodeToolbarItem[],
-  codeBlock: CodeBlockComponent
+  codeBlock: CodeBlockComponent,
+  onClick?: () => void
 ) {
   return items
     .filter(item => item.showWhen(codeBlock))
@@ -31,20 +41,18 @@ export function CodeToolbarItemRenderer(
       switch (item.type) {
         case 'action':
           return html`
-            <icon-button
+            <editor-icon-button
               class="code-toolbar-button ${item.name}"
               data-testid=${item.name}
-              size="24px"
-              @click=${() => item.action(codeBlock)}
+              .tooltip=${item.tooltip}
+              .tooltipOffset=${4}
+              @click=${() => item.action(codeBlock, onClick)}
             >
               ${item.icon}
-              <affine-tooltip tip-position="top" .offset=${5}
-                >${item.tooltip}</affine-tooltip
-              >
-            </icon-button>
+            </editor-icon-button>
           `;
         case 'custom':
-          return item.render(codeBlock);
+          return item.render(codeBlock, onClick);
         default:
           return null;
       }
@@ -52,11 +60,56 @@ export function CodeToolbarItemRenderer(
     .filter(item => item !== null);
 }
 
-export function CodeToolbarMoreMenuBuilder(
-  items: CodeToolbarMoreItem[],
-  codeBlock: CodeBlockComponent
+export function MoreMenuRenderer(
+  block: CodeBlockComponent,
+  abortController: AbortController,
+  config: CodeToolbarMoreItem[]
 ) {
-  return items
-    .filter(item => item.showWhen(codeBlock))
-    .map(item => item.render(codeBlock));
+  return config
+    .filter(item => {
+      return item.type === 'divider' || item.showWhen(block);
+    })
+    .map(item => {
+      let template: TemplateResult | null = null;
+      switch (item.type) {
+        case 'more': {
+          const moreItem = item as MoreItem;
+          const name =
+            moreItem.name instanceof Function
+              ? moreItem.name(block)
+              : moreItem.name;
+          const icon =
+            moreItem.icon instanceof Function
+              ? moreItem.icon(block)
+              : moreItem.icon;
+          const buttonClass = `menu-item ${name.toLocaleLowerCase().split(' ').join('-')}`;
+          template = html`
+            <editor-menu-action
+              class=${buttonClass}
+              @click=${(e: MouseEvent) => {
+                e.stopPropagation();
+                moreItem.action(block, abortController);
+              }}
+            >
+              ${icon} ${name}
+            </editor-menu-action>
+          `;
+          break;
+        }
+        case 'divider': {
+          template = html`
+            <editor-toolbar-separator
+              data-orientation="horizontal"
+            ></editor-toolbar-separator>
+          `;
+          break;
+        }
+        default:
+          template = null;
+      }
+
+      return template;
+    })
+    .filter((template): template is TemplateResult => template !== null)
+    .map(template => template);
 }

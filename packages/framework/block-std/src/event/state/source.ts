@@ -14,8 +14,10 @@ export type EventSourceStateOptions = {
 };
 
 export class EventSourceState extends UIEventState {
-  override type = 'sourceState';
   readonly sourceType: EventScopeSourceType;
+
+  override type = 'sourceState';
+
   constructor({ event, sourceType }: EventSourceStateOptions) {
     super(event);
     this.sourceType = sourceType;

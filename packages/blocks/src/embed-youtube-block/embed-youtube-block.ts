@@ -1,53 +1,47 @@
-import { assertExists } from '@blocksuite/global/utils';
 import { html, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 
+import type { EmbedYoutubeStyles } from './embed-youtube-model.js';
+import type { EmbedYoutubeBlockService } from './embed-youtube-service.js';
+
 import { EMBED_CARD_HEIGHT, EMBED_CARD_WIDTH } from '../_common/consts.js';
-import { EmbedBlockElement } from '../_common/embed-block-helper/embed-block-element.js';
+import { EmbedBlockComponent } from '../_common/embed-block-helper/embed-block-element.js';
 import { OpenIcon } from '../_common/icons/text.js';
 import { getEmbedCardIcons } from '../_common/utils/url.js';
-import type { EmbedYoutubeStyles } from './embed-youtube-model.js';
 import {
   type EmbedYoutubeModel,
   youtubeUrlRegex,
 } from './embed-youtube-model.js';
-import type { EmbedYoutubeBlockService } from './embed-youtube-service.js';
-import { styles, YoutubeIcon } from './styles.js';
+import { YoutubeIcon, styles } from './styles.js';
 import { refreshEmbedYoutubeUrlData } from './utils.js';
 
 @customElement('affine-embed-youtube-block')
-export class EmbedYoutubeBlockComponent extends EmbedBlockElement<
+export class EmbedYoutubeBlockComponent extends EmbedBlockComponent<
   EmbedYoutubeModel,
   EmbedYoutubeBlockService
 > {
-  static override styles = styles;
-
   override _cardStyle: (typeof EmbedYoutubeStyles)[number] = 'video';
-
-  @property({ attribute: false })
-  accessor loading = false;
-
-  @state()
-  private accessor _isSelected = false;
-
-  @state()
-  private accessor _showOverlay = true;
-
-  @state()
-  private accessor _showImage = false;
 
   private _isDragging = false;
 
   private _isResizing = false;
 
-  private _selectBlock() {
-    const selectionManager = this.host.selection;
-    const blockSelection = selectionManager.create('block', {
-      blockId: this.blockId,
-    });
-    selectionManager.setGroup('note', [blockSelection]);
-  }
+  static override styles = styles;
+
+  open = () => {
+    let link = this.model.url;
+    if (!link.match(/^[a-zA-Z]+:\/\//)) {
+      link = 'https://' + link;
+    }
+    window.open(link, '_blank');
+  };
+
+  refreshData = () => {
+    refreshEmbedYoutubeUrlData(this, this.fetchAbortController.signal).catch(
+      console.error
+    );
+  };
 
   private _handleClick(event: MouseEvent) {
     event.stopPropagation();
@@ -61,17 +55,13 @@ export class EmbedYoutubeBlockComponent extends EmbedBlockElement<
     this.open();
   }
 
-  open = () => {
-    let link = this.model.url;
-    if (!link.match(/^[a-zA-Z]+:\/\//)) {
-      link = 'https://' + link;
-    }
-    window.open(link, '_blank');
-  };
-
-  refreshData = () => {
-    refreshEmbedYoutubeUrlData(this).catch(console.error);
-  };
+  private _selectBlock() {
+    const selectionManager = this.host.selection;
+    const blockSelection = selectionManager.create('block', {
+      blockId: this.blockId,
+    });
+    selectionManager.setGroup('note', [blockSelection]);
+  }
 
   override connectedCallback() {
     super.connectedCallback();
@@ -115,8 +105,14 @@ export class EmbedYoutubeBlockComponent extends EmbedBlockElement<
       })
     );
     // this is required to prevent iframe from capturing pointer events
-    this.handleEvent('pointerMove', ctx => {
-      this._isDragging = ctx.get('pointerState').dragging;
+    this.handleEvent('dragStart', () => {
+      this._isDragging = true;
+      this._showOverlay =
+        this._isResizing || this._isDragging || !this._isSelected;
+    });
+
+    this.handleEvent('dragEnd', () => {
+      this._isDragging = false;
       this._showOverlay =
         this._isResizing || this._isDragging || !this._isSelected;
     });
@@ -126,20 +122,18 @@ export class EmbedYoutubeBlockComponent extends EmbedBlockElement<
     });
 
     if (this.isInSurface) {
-      const surface = this.surface;
-      assertExists(surface);
       this.disposables.add(
         this.model.propsUpdated.on(() => {
           this.requestUpdate();
         })
       );
 
-      this.edgeless?.slots.elementResizeStart.on(() => {
+      this.rootService?.slots.elementResizeStart.on(() => {
         this._isResizing = true;
         this._showOverlay = true;
       });
 
-      this.edgeless?.slots.elementResizeEnd.on(() => {
+      this.rootService?.slots.elementResizeEnd.on(() => {
         this._isResizing = false;
         this._showOverlay =
           this._isResizing || this._isDragging || !this._isSelected;
@@ -259,11 +253,21 @@ export class EmbedYoutubeBlockComponent extends EmbedBlockElement<
             </div>
           </div>
         </div>
-
-        ${this.isInSurface ? nothing : Object.values(this.widgets)}
       `
     );
   }
+
+  @state()
+  private accessor _isSelected = false;
+
+  @state()
+  private accessor _showImage = false;
+
+  @state()
+  private accessor _showOverlay = true;
+
+  @property({ attribute: false })
+  accessor loading = false;
 }
 
 declare global {

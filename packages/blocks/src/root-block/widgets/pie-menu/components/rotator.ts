@@ -1,4 +1,4 @@
-import { css, html, LitElement, nothing } from 'lit';
+import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
@@ -22,11 +22,6 @@ const styles = css`
 @customElement('pie-center-rotator')
 export class PieCenterRotator extends LitElement {
   static override styles = styles;
-  @property({ attribute: false })
-  accessor isActive!: boolean;
-
-  @property({ attribute: false })
-  accessor angle: number | null = null;
 
   protected override render() {
     if (!this.isActive || this.angle === null) return nothing;
@@ -39,6 +34,12 @@ export class PieCenterRotator extends LitElement {
 
     return html`<span style="${styleMap(styles)}" class="rotator"></span>`;
   }
+
+  @property({ attribute: false })
+  accessor angle: number | null = null;
+
+  @property({ attribute: false })
+  accessor isActive!: boolean;
 }
 
 declare global {

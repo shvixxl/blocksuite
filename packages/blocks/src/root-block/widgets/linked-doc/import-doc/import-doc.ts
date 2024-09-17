@@ -1,15 +1,18 @@
-import '../../../../_common/components/loader.js';
-
 import { WithDisposable } from '@blocksuite/block-std';
 import { sha } from '@blocksuite/global/utils';
-import { type DocCollection, extMimeMap } from '@blocksuite/store';
+import {
+  type DocCollection,
+  type JobMiddleware,
+  extMimeMap,
+} from '@blocksuite/store';
 import { Job } from '@blocksuite/store';
 import JSZip from 'jszip';
-import { html, LitElement, type PropertyValues } from 'lit';
+import { LitElement, type PropertyValues, html } from 'lit';
 import { customElement, query, state } from 'lit/decorators.js';
 
 import { MarkdownAdapter } from '../../../../_common/adapters/markdown.js';
 import { NotionHtmlAdapter } from '../../../../_common/adapters/notion-html.js';
+import '../../../../_common/components/loader.js';
 import {
   CloseIcon,
   ExportToHTMLIcon,
@@ -36,28 +39,37 @@ export async function importMarkDown(
   text: string,
   fileName?: string
 ) {
+  const fileNameMiddleware: JobMiddleware = ({ slots }) => {
+    slots.beforeImport.on(payload => {
+      if (payload.type !== 'page') {
+        return;
+      }
+      if (!fileName) {
+        return;
+      }
+      payload.snapshot.meta.title = fileName;
+      payload.snapshot.blocks.props.title = {
+        '$blocksuite:internal:text$': true,
+        delta: [
+          {
+            insert: fileName,
+          },
+        ],
+      };
+    });
+  };
   const job = new Job({
     collection,
-    middlewares: [defaultImageProxyMiddleware],
+    middlewares: [defaultImageProxyMiddleware, fileNameMiddleware],
   });
-  const mdAdapter = new MarkdownAdapter();
-  mdAdapter.applyConfigs(job.adapterConfigs);
-  const snapshot = await mdAdapter.toDocSnapshot({
+  const mdAdapter = new MarkdownAdapter(job);
+  const page = await mdAdapter.toDoc({
     file: text,
     assets: job.assetsManager,
   });
-  if (fileName) {
-    snapshot.meta.title = fileName;
-    snapshot.blocks.props.title = {
-      '$blocksuite:internal:text$': true,
-      delta: [
-        {
-          insert: fileName,
-        },
-      ],
-    };
+  if (!page) {
+    return;
   }
-  const page = await job.snapshotToDoc(snapshot);
   return page.id;
 }
 
@@ -66,13 +78,15 @@ export async function importHtml(collection: DocCollection, text: string) {
     collection,
     middlewares: [defaultImageProxyMiddleware],
   });
-  const htmlAdapter = new NotionHtmlAdapter();
-  htmlAdapter.applyConfigs(job.adapterConfigs);
+  const htmlAdapter = new NotionHtmlAdapter(job);
   const snapshot = await htmlAdapter.toDocSnapshot({
     file: text,
     assets: job.assetsManager,
   });
   const page = await job.snapshotToDoc(snapshot);
+  if (!page) {
+    return;
+  }
   return page.id;
 }
 
@@ -142,22 +156,22 @@ export async function importNotion(collection: DocCollection, file: File) {
         collection: collection,
         middlewares: [defaultImageProxyMiddleware],
       });
-      const htmlAdapter = new NotionHtmlAdapter();
-      htmlAdapter.applyConfigs(job.adapterConfigs);
+      const htmlAdapter = new NotionHtmlAdapter(job);
       const assets = job.assetsManager.getAssets();
       for (const [key, value] of pendingAssets.entries()) {
         if (!assets.has(key)) {
           assets.set(key, value);
         }
       }
-      const snapshot = await htmlAdapter.toDocSnapshot({
+      const page = await htmlAdapter.toDoc({
         file: await zipFile.files[file].async('text'),
         pageId: pageMap.get(file),
         pageMap,
         assets: job.assetsManager,
       });
-      const page = await job.snapshotToDoc(snapshot);
-      pageIds.push(page.id);
+      if (page) {
+        pageIds.push(page.id);
+      }
     });
     promises.push(...pagePromises);
     return promises;
@@ -170,24 +184,6 @@ export async function importNotion(collection: DocCollection, file: File) {
 @customElement('import-doc')
 export class ImportDoc extends WithDisposable(LitElement) {
   static override styles = styles;
-
-  @state()
-  accessor _loading = false;
-
-  @state()
-  accessor x = 0;
-
-  @state()
-  accessor y = 0;
-
-  @state()
-  accessor _startX = 0;
-
-  @state()
-  accessor _startY = 0;
-
-  @query('.container')
-  accessor containerEl!: HTMLElement;
 
   constructor(
     private collection: DocCollection,
@@ -207,48 +203,26 @@ export class ImportDoc extends WithDisposable(LitElement) {
     this._onMouseMove = this._onMouseMove.bind(this);
   }
 
-  override updated(changedProps: PropertyValues) {
-    if (changedProps.has('x') || changedProps.has('y')) {
-      this.containerEl.style.transform = `translate(${this.x}px, ${this.y}px)`;
+  private async _importHtml() {
+    const files = await openFileOrFiles({ acceptType: 'Html', multiple: true });
+    if (!files) return;
+    const pageIds: string[] = [];
+    for (const file of files) {
+      const text = await file.text();
+      const needLoading = file.size > SHOW_LOADING_SIZE;
+      if (needLoading) {
+        this.hidden = false;
+        this._loading = true;
+      } else {
+        this.abortController.abort();
+      }
+      const pageId = await importHtml(this.collection, text);
+      needLoading && this.abortController.abort();
+      if (pageId) {
+        pageIds.push(pageId);
+      }
     }
-  }
-
-  private _onMouseDown(event: MouseEvent) {
-    this._startX = event.clientX - this.x;
-    this._startY = event.clientY - this.y;
-    window.addEventListener('mousemove', this._onMouseMove);
-  }
-
-  private _onMouseUp() {
-    window.removeEventListener('mousemove', this._onMouseMove);
-  }
-
-  private _onMouseMove(event: MouseEvent) {
-    this.x = event.clientX - this._startX;
-    this.y = event.clientY - this._startY;
-  }
-
-  private _onCloseClick(event: MouseEvent) {
-    event.stopPropagation();
-    this.abortController.abort();
-  }
-
-  private _onImportSuccess(
-    pageIds: string[],
-    options: { isWorkspaceFile?: boolean; importedCount?: number } = {}
-  ) {
-    const {
-      isWorkspaceFile = false,
-      importedCount: pagesImportedCount = pageIds.length,
-    } = options;
-    this.onSuccess?.(pageIds, {
-      isWorkspaceFile,
-      importedCount: pagesImportedCount,
-    });
-  }
-
-  private _onFail(message: string) {
-    this.onFail?.(message);
+    this._onImportSuccess(pageIds);
   }
 
   private async _importMarkDown() {
@@ -270,27 +244,9 @@ export class ImportDoc extends WithDisposable(LitElement) {
       }
       const pageId = await importMarkDown(this.collection, text, fileName);
       needLoading && this.abortController.abort();
-      pageIds.push(pageId);
-    }
-    this._onImportSuccess(pageIds);
-  }
-
-  private async _importHtml() {
-    const files = await openFileOrFiles({ acceptType: 'Html', multiple: true });
-    if (!files) return;
-    const pageIds: string[] = [];
-    for (const file of files) {
-      const text = await file.text();
-      const needLoading = file.size > SHOW_LOADING_SIZE;
-      if (needLoading) {
-        this.hidden = false;
-        this._loading = true;
-      } else {
-        this.abortController.abort();
+      if (pageId) {
+        pageIds.push(pageId);
       }
-      const pageId = await importHtml(this.collection, text);
-      needLoading && this.abortController.abort();
-      pageIds.push(pageId);
     }
     this._onImportSuccess(pageIds);
   }
@@ -332,6 +288,44 @@ export class ImportDoc extends WithDisposable(LitElement) {
     });
   }
 
+  private _onCloseClick(event: MouseEvent) {
+    event.stopPropagation();
+    this.abortController.abort();
+  }
+
+  private _onFail(message: string) {
+    this.onFail?.(message);
+  }
+
+  private _onImportSuccess(
+    pageIds: string[],
+    options: { isWorkspaceFile?: boolean; importedCount?: number } = {}
+  ) {
+    const {
+      isWorkspaceFile = false,
+      importedCount: pagesImportedCount = pageIds.length,
+    } = options;
+    this.onSuccess?.(pageIds, {
+      isWorkspaceFile,
+      importedCount: pagesImportedCount,
+    });
+  }
+
+  private _onMouseDown(event: MouseEvent) {
+    this._startX = event.clientX - this.x;
+    this._startY = event.clientY - this.y;
+    window.addEventListener('mousemove', this._onMouseMove);
+  }
+
+  private _onMouseMove(event: MouseEvent) {
+    this.x = event.clientX - this._startX;
+    this.y = event.clientY - this._startY;
+  }
+
+  private _onMouseUp() {
+    window.removeEventListener('mousemove', this._onMouseMove);
+  }
+
   private _openLearnImportLink(event: MouseEvent) {
     event.stopPropagation();
     window.open(
@@ -343,7 +337,7 @@ export class ImportDoc extends WithDisposable(LitElement) {
   override render() {
     if (this._loading) {
       return html`
-        <div class="overlay-mask blocksuite-overlay"></div>
+        <div class="overlay-mask"></div>
         <div class="container">
           <header
             class="loading-header"
@@ -362,7 +356,7 @@ export class ImportDoc extends WithDisposable(LitElement) {
     }
     return html`
       <div
-        class="overlay-mask blocksuite-overlay"
+        class="overlay-mask"
         @click="${() => this.abortController.abort()}"
       ></div>
       <div class="container">
@@ -424,4 +418,28 @@ export class ImportDoc extends WithDisposable(LitElement) {
       </div>
     `;
   }
+
+  override updated(changedProps: PropertyValues) {
+    if (changedProps.has('x') || changedProps.has('y')) {
+      this.containerEl.style.transform = `translate(${this.x}px, ${this.y}px)`;
+    }
+  }
+
+  @state()
+  accessor _loading = false;
+
+  @state()
+  accessor _startX = 0;
+
+  @state()
+  accessor _startY = 0;
+
+  @query('.container')
+  accessor containerEl!: HTMLElement;
+
+  @state()
+  accessor x = 0;
+
+  @state()
+  accessor y = 0;
 }

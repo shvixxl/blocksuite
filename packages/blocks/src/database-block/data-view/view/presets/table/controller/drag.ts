@@ -3,89 +3,12 @@
 import type { ReactiveController } from 'lit';
 
 import type { InsertToPosition } from '../../../../types.js';
-import { startDrag } from '../../../../utils/drag.js';
-import { TableRow } from '../components/row.js';
 import type { DataViewTable } from '../table-view.js';
 
+import { startDrag } from '../../../../utils/drag.js';
+import { TableRow } from '../components/row.js';
+
 export class TableDragController implements ReactiveController {
-  constructor(private host: DataViewTable) {
-    this.host.addController(this);
-  }
-
-  dropPreview = createDropPreview();
-
-  getInsertPosition = (
-    evt: MouseEvent
-  ):
-    | {
-        groupKey: string | undefined;
-        position: InsertToPosition;
-        y: number;
-        width: number;
-        x: number;
-      }
-    | undefined => {
-    const y = evt.y;
-    const tableRect = this.host.getBoundingClientRect();
-    const rows = this.host.querySelectorAll('data-view-table-row');
-    if (!rows || !tableRect || y < tableRect.top) {
-      return;
-    }
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows.item(i);
-      const rect = row.getBoundingClientRect();
-      const mid = (rect.top + rect.bottom) / 2;
-      if (y < rect.bottom) {
-        return {
-          groupKey: row.groupKey,
-          position: {
-            id: row.dataset.rowId as string,
-            before: y < mid,
-          },
-          y: y < mid ? rect.top : rect.bottom,
-          width: tableRect.width,
-          x: tableRect.left,
-        };
-      }
-    }
-    return;
-  };
-  showIndicator = (evt: MouseEvent) => {
-    const position = this.getInsertPosition(evt);
-    if (position) {
-      this.dropPreview.display(position.x, position.y, position.width);
-    } else {
-      this.dropPreview.remove();
-    }
-    return position;
-  };
-
-  hostConnected() {
-    if (this.host.view.readonly) {
-      return;
-    }
-    this.host.disposables.add(
-      this.host.handleEvent('dragStart', context => {
-        const event = context.get('pointerState').raw;
-        const target = event.target;
-        if (
-          target instanceof Element &&
-          this.host.contains(target) &&
-          target.closest('.data-view-table-view-drag-handler')
-        ) {
-          event.preventDefault();
-          const row = target.closest('data-view-table-row');
-          if (row) {
-            getSelection()?.removeAllRanges();
-            this.dragStart(row, event);
-          }
-          return true;
-        }
-        return false;
-      })
-    );
-  }
-
   dragStart = (row: TableRow, evt: PointerEvent) => {
     const eleRect = row.getBoundingClientRect();
     const offsetLeft = evt.x - eleRect.left;
@@ -154,6 +77,85 @@ export class TableDragController implements ReactiveController {
       },
     });
   };
+
+  dropPreview = createDropPreview();
+
+  getInsertPosition = (
+    evt: MouseEvent
+  ):
+    | {
+        groupKey: string | undefined;
+        position: InsertToPosition;
+        y: number;
+        width: number;
+        x: number;
+      }
+    | undefined => {
+    const y = evt.y;
+    const tableRect = this.host.getBoundingClientRect();
+    const rows = this.host.querySelectorAll('data-view-table-row');
+    if (!rows || !tableRect || y < tableRect.top) {
+      return;
+    }
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows.item(i);
+      const rect = row.getBoundingClientRect();
+      const mid = (rect.top + rect.bottom) / 2;
+      if (y < rect.bottom) {
+        return {
+          groupKey: row.groupKey,
+          position: {
+            id: row.dataset.rowId as string,
+            before: y < mid,
+          },
+          y: y < mid ? rect.top : rect.bottom,
+          width: tableRect.width,
+          x: tableRect.left,
+        };
+      }
+    }
+    return;
+  };
+
+  showIndicator = (evt: MouseEvent) => {
+    const position = this.getInsertPosition(evt);
+    if (position) {
+      this.dropPreview.display(position.x, position.y, position.width);
+    } else {
+      this.dropPreview.remove();
+    }
+    return position;
+  };
+
+  constructor(private host: DataViewTable) {
+    this.host.addController(this);
+  }
+
+  hostConnected() {
+    if (this.host.view.readonly$.value) {
+      return;
+    }
+    this.host.disposables.add(
+      this.host.handleEvent('dragStart', context => {
+        const event = context.get('pointerState').raw;
+        const target = event.target;
+        if (
+          target instanceof Element &&
+          this.host.contains(target) &&
+          target.closest('.data-view-table-view-drag-handler')
+        ) {
+          event.preventDefault();
+          const row = target.closest('data-view-table-row');
+          if (row) {
+            getSelection()?.removeAllRanges();
+            this.dragStart(row, event);
+          }
+          return true;
+        }
+        return false;
+      })
+    );
+  }
 }
 
 const createDragPreview = (row: TableRow, x: number, y: number) => {
@@ -163,7 +165,7 @@ const createDragPreview = (row: TableRow, x: number, y: number) => {
   cloneRow.rowIndex = row.rowIndex;
   cloneRow.rowId = row.rowId;
   div.append(cloneRow);
-  div.className = 'with-data-view-css-variable blocksuite-overlay';
+  div.className = 'with-data-view-css-variable';
   div.style.width = `${row.getBoundingClientRect().width}px`;
   div.style.position = 'fixed';
   div.style.pointerEvents = 'none';
@@ -185,7 +187,6 @@ const createDragPreview = (row: TableRow, x: number, y: number) => {
 };
 const createDropPreview = () => {
   const div = document.createElement('div');
-  div.classList.add('blocksuite-overlay');
   div.dataset.isDropPreview = 'true';
   div.style.pointerEvents = 'none';
   div.style.position = 'fixed';

@@ -3,8 +3,9 @@ import {
   type AIItemGroupConfig,
   EdgelessRootService,
 } from '@blocksuite/blocks';
-import { css, html, LitElement } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
+import { styleMap } from 'lit/directives/style-map.js';
 
 import { getRootService } from '../../utils/selection-utils.js';
 
@@ -18,7 +19,6 @@ export class AskAIPanel extends WithDisposable(LitElement) {
     .ask-ai-panel {
       box-sizing: border-box;
       padding: 8px;
-      min-width: 330px;
       max-height: 374px;
       overflow-y: auto;
       background: var(--affine-background-overlay-panel-color);
@@ -42,23 +42,6 @@ export class AskAIPanel extends WithDisposable(LitElement) {
     }
   `;
 
-  @property({ attribute: false })
-  accessor host!: EditorHost;
-
-  @property({ attribute: false })
-  accessor actionGroups!: AIItemGroupConfig[];
-
-  @property({ attribute: false })
-  accessor abortController: AbortController | null = null;
-
-  get _edgeless() {
-    const rootService = getRootService(this.host);
-    if (rootService instanceof EdgelessRootService) {
-      return rootService;
-    }
-    return null;
-  }
-
   get _actionGroups() {
     const filteredConfig = this.actionGroups
       .map(group => ({
@@ -77,14 +60,37 @@ export class AskAIPanel extends WithDisposable(LitElement) {
     return filteredConfig;
   }
 
+  get _edgeless() {
+    const rootService = getRootService(this.host);
+    if (rootService instanceof EdgelessRootService) {
+      return rootService;
+    }
+    return null;
+  }
+
   override render() {
-    return html`<div class="ask-ai-panel">
+    const style = styleMap({
+      minWidth: `${this.minWidth}px`,
+    });
+    return html`<div class="ask-ai-panel" style=${style}>
       <ai-item-list
         .host=${this.host}
         .groups=${this._actionGroups}
       ></ai-item-list>
     </div>`;
   }
+
+  @property({ attribute: false })
+  accessor abortController: AbortController | null = null;
+
+  @property({ attribute: false })
+  accessor actionGroups!: AIItemGroupConfig[];
+
+  @property({ attribute: false })
+  accessor host!: EditorHost;
+
+  @property({ attribute: false })
+  accessor minWidth = 330;
 }
 
 declare global {

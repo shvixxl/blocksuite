@@ -1,20 +1,26 @@
-import { DEFAULT_CENTRAL_AREA_RATIO, type IBound } from '../../../consts.js';
-import { Bound } from '../../../utils/bound.js';
+import type { IVec } from '@blocksuite/global/utils';
+import type { IBound } from '@blocksuite/global/utils';
+
+import { Vec } from '@blocksuite/global/utils';
+import { Bound } from '@blocksuite/global/utils';
+import { PointLocation } from '@blocksuite/global/utils';
+
+import type { PointTestOptions } from '../../base.js';
+import type { ShapeElementModel } from '../../shape.js';
+
+import { DEFAULT_CENTRAL_AREA_RATIO } from '../../../consts.js';
 import {
+  clamp,
   getPointsFromBoundsWithRotation,
   lineEllipseIntersects,
   pointInEllipse,
   pointInPolygon,
-  polygonGetPointTangent,
   rotatePoints,
+  toRadian,
 } from '../../../utils/math-utils.js';
-import { PointLocation } from '../../../utils/point-location.js';
-import type { IVec2 } from '../../../utils/vec.js';
-import type { IHitTestOptions } from '../../base.js';
-import type { ShapeElementModel } from '../../shape.js';
 
 export const ellipse = {
-  points({ x, y, w, h }: IBound) {
+  points({ x, y, w, h }: IBound): IVec[] {
     return [
       [x, y + h / 2],
       [x + w / 2, y],
@@ -36,17 +42,17 @@ export const ellipse = {
 
     ctx.restore();
   },
-  hitTest(
+  includesPoint(
     this: ShapeElementModel,
     x: number,
     y: number,
-    options: IHitTestOptions
+    options: PointTestOptions
   ) {
-    const point = [x, y];
+    const point: IVec = [x, y];
     const expand = (options?.expand ?? 1) / (options?.zoom ?? 1);
     const rx = this.w / 2;
     const ry = this.h / 2;
-    const center = [this.x + rx, this.y + ry];
+    const center: IVec = [this.x + rx, this.y + ry];
     const rad = (this.rotate * Math.PI) / 180;
 
     let hit =
@@ -64,59 +70,88 @@ export const ellipse = {
           const centralRx = rx * DEFAULT_CENTRAL_AREA_RATIO;
           const centralRy = ry * DEFAULT_CENTRAL_AREA_RATIO;
           hit = pointInEllipse(point, center, centralRx, centralRy, rad);
-        } else {
-          hit = this.textBound
-            ? pointInPolygon(
-                [x, y],
-                getPointsFromBoundsWithRotation(this.textBound)
-              )
-            : false;
+        } else if (this.textBound) {
+          hit = pointInPolygon(
+            point,
+            getPointsFromBoundsWithRotation(
+              this,
+              () => Bound.from(this.textBound!).points
+            )
+          );
         }
       }
     }
 
     return hit;
   },
-  containedByBounds(bounds: Bound, element: ShapeElementModel): boolean {
+  containsBound(bounds: Bound, element: ShapeElementModel): boolean {
     const points = getPointsFromBoundsWithRotation(element, ellipse.points);
     return points.some(point => bounds.containsPoint(point));
   },
 
-  getNearestPoint(point: IVec2, _element: ShapeElementModel) {
-    const bound = Bound.deserialize(_element.xywh);
+  // See links:
+  // * https://github.com/0xfaded/ellipse_demo/issues/1
+  // * https://blog.chatfield.io/simple-method-for-distance-to-ellipse/
+  // * https://gist.github.com/fundon/11331322d3ca223c42e216df48c339e1
+  // * https://github.com/excalidraw/excalidraw/blob/master/packages/utils/geometry/geometry.ts#L888 (MIT)
+  getNearestPoint(point: IVec, { rotate, xywh }: ShapeElementModel) {
+    const { center, w, h } = Bound.deserialize(xywh);
+    const rad = toRadian(rotate);
+    const a = w / 2;
+    const b = h / 2;
 
-    const iterations = 1000;
-    const learningRate = 0.01;
-    const cx = bound.center[0];
-    const cy = bound.center[1];
-    const rx = bound.w / 2;
-    const ry = bound.h / 2;
+    // Use the center of the ellipse as the origin
+    const [rotatedPointX, rotatedPointY] = Vec.rot(
+      Vec.sub(point, center),
+      -rad
+    );
 
-    let x = (point[0] - cx) / rx;
-    let y = (point[1] - cy) / ry;
+    const px = Math.abs(rotatedPointX);
+    const py = Math.abs(rotatedPointY);
 
-    for (let i = 0; i < iterations; i++) {
-      const distance = Math.sqrt(x * x + y * y);
-      const normalX = x / distance;
-      const normalY = y / distance;
+    let tx = Math.SQRT1_2; // 0.707
+    let ty = Math.SQRT1_2; // 0.707
+    let i = 0;
 
-      const toPx = point[0] - (point[0] + x * rx);
-      const toPy = point[1] - (point[1] + y * ry);
-      const dot = toPx * normalX * rx + toPy * normalY * ry;
+    for (; i < 3; i++) {
+      const x = a * tx;
+      const y = b * ty;
 
-      x -= learningRate * dot * normalX;
-      y -= learningRate * dot * normalY;
-      const angle = Math.atan2(y, x);
-      x = Math.cos(angle);
-      y = Math.sin(angle);
+      const ex = ((a * a - b * b) * tx ** 3) / a;
+      const ey = ((b * b - a * a) * ty ** 3) / b;
+
+      const rx = x - ex;
+      const ry = y - ey;
+
+      const qx = px - ex;
+      const qy = py - ey;
+
+      const r = Math.hypot(ry, rx);
+      const q = Math.hypot(qy, qx);
+
+      tx = clamp(((qx * r) / q + ex) / a, 0, 1);
+      ty = clamp(((qy * r) / q + ey) / b, 0, 1);
+      const t = Math.hypot(ty, tx);
+      tx /= t;
+      ty /= t;
     }
 
-    return [cx + x * rx, cy + y * ry];
+    return Vec.add(
+      Vec.rot(
+        [a * tx * Math.sign(rotatedPointX), b * ty * Math.sign(rotatedPointY)],
+        rad
+      ),
+      center
+    );
   },
 
-  intersectWithLine(start: IVec2, end: IVec2, element: ShapeElementModel) {
-    const rad = (element.rotate * Math.PI) / 180;
-    const bound = Bound.deserialize(element.xywh);
+  getLineIntersections(
+    start: IVec,
+    end: IVec,
+    { rotate, xywh }: ShapeElementModel
+  ) {
+    const rad = toRadian(rotate);
+    const bound = Bound.deserialize(xywh);
     return lineEllipseIntersects(
       start,
       end,
@@ -127,15 +162,43 @@ export const ellipse = {
     );
   },
 
-  getRelativePointLocation(position: IVec2, element: ShapeElementModel) {
-    const bound = Bound.deserialize(element.xywh);
-    const point = bound.getRelativePoint(position);
-    let points = ellipse.points(bound);
-    points.push(point);
+  getRelativePointLocation(
+    relativePoint: IVec,
+    { rotate, xywh }: ShapeElementModel
+  ) {
+    const bounds = Bound.deserialize(xywh);
+    const point = bounds.getRelativePoint(relativePoint);
+    const { x, y, w, h, center } = bounds;
+    const points = rotatePoints(
+      [
+        [x, y],
+        [x + w / 2, y],
+        [x + w, y],
+        [x + w, y + h / 2],
+        [x + w, y + h],
+        [x + w / 2, y + h],
+        [x, y + h],
+        [x, y + h / 2],
+        point,
+      ],
+      center,
+      rotate
+    );
+    const rotatedPoint = points.pop() as IVec;
+    const len = points.length;
+    let tangent: IVec = [0, 0.5];
+    let i = 0;
 
-    points = rotatePoints(points, bound.center, element.rotate);
-    const rotatePoint = points.pop() as IVec2;
-    const tangent = polygonGetPointTangent(points, rotatePoint);
-    return new PointLocation(rotatePoint, tangent);
+    for (; i < len; i++) {
+      const p0 = points[i];
+      const p1 = points[(i + 1) % len];
+      const bounds = Bound.fromPoints([p0, p1, center]);
+      if (bounds.containsPoint(rotatedPoint)) {
+        tangent = Vec.normalize(Vec.sub(p1, p0));
+        break;
+      }
+    }
+
+    return new PointLocation(rotatedPoint, tangent);
   },
 };

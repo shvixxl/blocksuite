@@ -1,6 +1,9 @@
 import type { CursorSelection } from '@blocksuite/block-std';
 import type { SurfaceSelection } from '@blocksuite/block-std';
-import { assertType, DisposableGroup, Slot } from '@blocksuite/global/utils';
+
+import { DisposableGroup, Slot, assertType } from '@blocksuite/global/utils';
+
+import type { EdgelessRootService } from '../edgeless-root-service.js';
 
 import { groupBy } from '../../../_common/utils/iterable.js';
 import { MindmapElementModel } from '../../../surface-block/element-model/mindmap.js';
@@ -8,7 +11,6 @@ import {
   GroupElementModel,
   type SurfaceBlockModel,
 } from '../../../surface-block/index.js';
-import type { EdgelessRootService } from '../edgeless-root-service.js';
 import { edgelessElementsBound } from '../utils/bound-utils.js';
 
 export interface EdgelessSelectionState {
@@ -34,11 +36,27 @@ export interface CursorSelectionState {
 }
 
 export class EdgelessSelectionManager {
-  service!: EdgelessRootService;
-  surfaceModel!: SurfaceBlockModel;
+  private _activeGroup: GroupElementModel | MindmapElementModel | null = null;
+
+  private _cursorSelection: CursorSelection | null = null;
+
+  private _lastSurfaceSelections: SurfaceSelection[] = [];
+
+  private _remoteCursorSelectionMap = new Map<number, CursorSelection>();
+
+  private _remoteSelectedSet = new Set<string>();
+
+  private _remoteSurfaceSelectionsMap = new Map<number, SurfaceSelection[]>();
+
+  private _selectedSet = new Set<string>();
+
+  private _surfaceSelections: SurfaceSelection[] = [];
+
   disposable: DisposableGroup = new DisposableGroup();
 
-  slots = {
+  service!: EdgelessRootService;
+
+  readonly slots = {
     updated: new Slot<SurfaceSelection[]>(),
     remoteUpdated: new Slot(),
 
@@ -46,66 +64,7 @@ export class EdgelessSelectionManager {
     remoteCursorUpdated: new Slot(),
   };
 
-  lastState: SurfaceSelection[] = [];
-  selections: SurfaceSelection[] = [];
-  cursor: CursorSelection | null = null;
-
-  remoteCursor: Map<number, CursorSelection> = new Map();
-  remoteSelection: Map<number, SurfaceSelection> = new Map();
-
-  private _activeGroup: GroupElementModel | MindmapElementModel | null = null;
-  private _selected: Set<string> = new Set();
-  private _selectedIds: string[] = [];
-  private _remoteSelected: Set<string> = new Set();
-
-  get empty() {
-    return this.selections.every(sel => sel.elements.length === 0);
-  }
-
-  get activeGroup() {
-    return this._activeGroup;
-  }
-
-  get editing() {
-    return this.selections.some(sel => sel.editing);
-  }
-
-  get inoperable() {
-    return this.selections.some(sel => sel.inoperable);
-  }
-
-  /**
-   * ids of the selected elements
-   */
-  get selectedIds() {
-    return this._selectedIds;
-  }
-
-  /**
-   * models of the selected elements
-   */
-  get elements() {
-    const elements: BlockSuite.EdgelessModelType[] = [];
-
-    this._selectedIds.forEach(id => {
-      const el = this.service.getElementById(id);
-      el && elements.push(el);
-    });
-
-    return elements;
-  }
-
-  get firstElement() {
-    return this.elements[0];
-  }
-
-  get selectedBound() {
-    return edgelessElementsBound(this.elements);
-  }
-
-  private get _selection() {
-    return this.service.std.selection;
-  }
+  surfaceModel!: SurfaceBlockModel;
 
   constructor(service: EdgelessRootService) {
     this.service = service;
@@ -113,33 +72,28 @@ export class EdgelessSelectionManager {
     this.mount();
   }
 
-  private _setState(selections: SurfaceSelection[]) {
-    this.lastState = this.selections;
-    this.selections = selections;
-    this._selected = new Set<string>();
-    this._selectedIds = [];
+  clear() {
+    this.stdSelectionManager.clear();
 
-    selections.forEach(sel =>
-      sel.elements.forEach(id => {
-        this._selected.add(id);
-        this._selectedIds.push(id);
-      })
-    );
+    this.set({
+      elements: [],
+      editing: false,
+    });
   }
 
-  private _setCursor(cursor: CursorSelection) {
-    this.cursor = cursor;
+  clearLast() {
+    this._lastSurfaceSelections = [];
   }
 
-  isEmpty(selections: SurfaceSelection[]) {
-    return selections.every(sel => sel.elements.length === 0);
+  dispose() {
+    this.disposable.dispose();
   }
 
   equals(selection: SurfaceSelection[]) {
     let count = 0;
     let editing = false;
     const exist = selection.every(sel => {
-      const exist = sel.elements.every(id => this._selected.has(id));
+      const exist = sel.elements.every(id => this._selectedSet.has(id));
 
       if (exist) {
         count += sel.elements.length;
@@ -150,12 +104,47 @@ export class EdgelessSelectionManager {
       return exist;
     });
 
-    return exist && count === this._selected.size && editing === this.editing;
+    return (
+      exist && count === this._selectedSet.size && editing === this.editing
+    );
+  }
+
+  /**
+   * check if the element is selected in local
+   * @param element
+   */
+  has(element: string) {
+    return this._selectedSet.has(element);
+  }
+
+  /**
+   * check if element is selected by remote peers
+   * @param element
+   */
+  hasRemote(element: string) {
+    return this._remoteSelectedSet.has(element);
+  }
+
+  isEmpty(selections: SurfaceSelection[]) {
+    return selections.every(sel => sel.elements.length === 0);
+  }
+
+  isInSelectedRect(viewX: number, viewY: number) {
+    const selected = this.selectedElements;
+    if (!selected.length) return false;
+
+    const commonBound = edgelessElementsBound(selected);
+
+    const [modelX, modelY] = this.service.viewport.toModelCoord(viewX, viewY);
+    if (commonBound && commonBound.isPointInBound([modelX, modelY])) {
+      return true;
+    }
+    return false;
   }
 
   mount() {
     this.disposable.add(
-      this._selection.slots.changed.on(selections => {
+      this.stdSelectionManager.slots.changed.on(selections => {
         const { cursor = [], surface = [] } = groupBy(selections, sel => {
           if (sel.is('surface')) {
             return 'surface';
@@ -169,8 +158,8 @@ export class EdgelessSelectionManager {
         assertType<CursorSelection[]>(cursor);
         assertType<SurfaceSelection[]>(surface);
 
-        if (cursor[0] && !this.cursor?.equals(cursor[0])) {
-          this._setCursor(cursor[0]);
+        if (cursor[0] && !this.cursorSelection?.equals(cursor[0])) {
+          this._cursorSelection = cursor[0];
           this.slots.cursorUpdated.emit(cursor[0]);
         }
 
@@ -178,16 +167,25 @@ export class EdgelessSelectionManager {
           return;
         }
 
-        this._setState(surface);
-        this.slots.updated.emit(this.selections);
+        this._lastSurfaceSelections = this.surfaceSelections;
+        this._surfaceSelections = surface;
+        this._selectedSet = new Set<string>();
+
+        surface.forEach(sel =>
+          sel.elements.forEach(id => {
+            this._selectedSet.add(id);
+          })
+        );
+
+        this.slots.updated.emit(this.surfaceSelections);
       })
     );
 
     this.disposable.add(
-      this._selection.slots.remoteChanged.on(states => {
-        const remoteSelection = new Map<number, SurfaceSelection>();
-        const remoteCursors = new Map<number, CursorSelection>();
-        const remoteSelectedElements = new Set<string>();
+      this.stdSelectionManager.slots.remoteChanged.on(states => {
+        const surfaceMap = new Map<number, SurfaceSelection[]>();
+        const cursorMap = new Map<number, CursorSelection>();
+        const selectedSet = new Set<string>();
 
         states.forEach((selections, id) => {
           let hasTextSelection = false;
@@ -203,54 +201,42 @@ export class EdgelessSelectionManager {
             }
 
             if (selection.is('surface')) {
-              remoteSelection.set(id, selection);
-              selection.elements.forEach(id => remoteSelectedElements.add(id));
+              const surfaceSelections = surfaceMap.get(id) ?? [];
+              surfaceSelections.push(selection);
+              surfaceMap.set(id, surfaceSelections);
+
+              selection.elements.forEach(id => selectedSet.add(id));
             }
 
             if (selection.is('cursor')) {
-              remoteCursors.set(id, selection);
+              cursorMap.set(id, selection);
             }
           });
 
           if (hasBlockSelection || hasTextSelection) {
-            remoteSelection.delete(id);
+            surfaceMap.delete(id);
           }
 
           if (hasTextSelection) {
-            remoteCursors.delete(id);
+            cursorMap.delete(id);
           }
         });
 
-        this.remoteCursor = remoteCursors;
-        this.remoteSelection = remoteSelection;
-        this._remoteSelected = remoteSelectedElements;
+        this._remoteCursorSelectionMap = cursorMap;
+        this._remoteSurfaceSelectionsMap = surfaceMap;
+        this._remoteSelectedSet = selectedSet;
+
         this.slots.remoteUpdated.emit();
         this.slots.remoteCursorUpdated.emit();
       })
     );
   }
 
-  /**
-   * check if element is selected by remote peers
-   * @param element
-   */
-  hasRemote(element: string) {
-    return this._remoteSelected.has(element);
-  }
-
-  /**
-   * check if the element is selected in local
-   * @param element
-   */
-  has(element: string) {
-    return this._selected.has(element);
-  }
-
   set(selection: EdgelessSelectionState | SurfaceSelection[]) {
     if (Array.isArray(selection)) {
-      this._selection.setGroup(
-        'edgeless',
-        this.cursor ? [...selection, this.cursor] : selection
+      this.stdSelectionManager.setGroup(
+        'gfx',
+        this.cursorSelection ? [...selection, this.cursorSelection] : selection
       );
       return;
     }
@@ -262,7 +248,7 @@ export class EdgelessSelectionManager {
 
     if (elements.length > 0) {
       instances.push(
-        this._selection.create(
+        this.stdSelectionManager.create(
           'surface',
           this.surfaceModel.id,
           elements,
@@ -275,7 +261,7 @@ export class EdgelessSelectionManager {
     if (blocks.length > 0) {
       instances = instances.concat(
         blocks.map(blockId =>
-          this._selection.create(
+          this.stdSelectionManager.create(
             'surface',
             blockId,
             [blockId],
@@ -286,13 +272,15 @@ export class EdgelessSelectionManager {
       );
     }
 
-    this._selection.setGroup(
-      'edgeless',
-      this.cursor ? instances.concat([this.cursor]) : instances
+    this.stdSelectionManager.setGroup(
+      'gfx',
+      this.cursorSelection
+        ? instances.concat([this.cursorSelection])
+        : instances
     );
 
     if (instances.length > 0) {
-      this._selection.setGroup('note', []);
+      this.stdSelectionManager.setGroup('note', []);
     }
 
     if (
@@ -303,8 +291,8 @@ export class EdgelessSelectionManager {
       this._activeGroup = this.firstElement;
     } else {
       if (
-        this.elements.some(ele => ele.group !== this._activeGroup) ||
-        this.elements.length === 0
+        this.selectedElements.some(ele => ele.group !== this._activeGroup) ||
+        this.selectedElements.length === 0
       ) {
         this._activeGroup = null;
       }
@@ -312,25 +300,86 @@ export class EdgelessSelectionManager {
   }
 
   setCursor(cursor: CursorSelection | CursorSelectionState) {
-    const instance = this._selection.create('cursor', cursor.x, cursor.y);
+    const instance = this.stdSelectionManager.create(
+      'cursor',
+      cursor.x,
+      cursor.y
+    );
 
-    this._selection.setGroup('edgeless', [...this.selections, instance]);
+    this.stdSelectionManager.setGroup('gfx', [
+      ...this.surfaceSelections,
+      instance,
+    ]);
   }
 
-  clear() {
-    this._selection.clear();
+  get activeGroup() {
+    return this._activeGroup;
+  }
 
-    this.set({
-      elements: [],
-      editing: false,
+  get cursorSelection() {
+    return this._cursorSelection;
+  }
+
+  get editing() {
+    return this.surfaceSelections.some(sel => sel.editing);
+  }
+
+  get empty() {
+    return this.surfaceSelections.every(sel => sel.elements.length === 0);
+  }
+
+  get firstElement() {
+    return this.selectedElements[0];
+  }
+
+  get inoperable() {
+    return this.surfaceSelections.some(sel => sel.inoperable);
+  }
+
+  get lastSurfaceSelections() {
+    return this._lastSurfaceSelections;
+  }
+
+  get remoteCursorSelectionMap() {
+    return this._remoteCursorSelectionMap;
+  }
+
+  get remoteSelectedSet() {
+    return this._remoteSelectedSet;
+  }
+
+  get remoteSurfaceSelectionsMap() {
+    return this._remoteSurfaceSelectionsMap;
+  }
+
+  get selectedBound() {
+    return edgelessElementsBound(this.selectedElements);
+  }
+
+  get selectedElements() {
+    const elements: BlockSuite.EdgelessModel[] = [];
+
+    this.selectedIds.forEach(id => {
+      const el = this.service.getElementById(id);
+      el && elements.push(el);
     });
+
+    return elements;
   }
 
-  clearLast() {
-    this.lastState = [];
+  get selectedIds() {
+    return [...this._selectedSet];
   }
 
-  dispose() {
-    this.disposable.dispose();
+  get selectedSet() {
+    return this._selectedSet;
+  }
+
+  get stdSelectionManager() {
+    return this.service.std.selection;
+  }
+
+  get surfaceSelections() {
+    return this._surfaceSelections;
   }
 }

@@ -1,5 +1,6 @@
+import type { Page } from '@playwright/test';
+
 import { NoteDisplayMode } from '@blocks/_common/types.js';
-import { type Page } from '@playwright/test';
 
 import {
   addNote,

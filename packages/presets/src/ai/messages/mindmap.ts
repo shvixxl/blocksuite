@@ -3,7 +3,8 @@ import type {
   AffineAIPanelWidgetConfig,
   MindmapStyle,
 } from '@blocksuite/blocks';
-import { markdownToMindmap, MiniMindmapPreview } from '@blocksuite/blocks';
+
+import { MiniMindmapPreview, markdownToMindmap } from '@blocksuite/blocks';
 import { noop } from '@blocksuite/global/utils';
 import { html, nothing } from 'lit';
 
@@ -69,7 +70,7 @@ export const createMindmapExecuteRenderer: (
     }
 
     ctx.set({
-      node: markdownToMindmap(answer),
+      node: markdownToMindmap(answer, host.doc),
     });
 
     handler(ctx);

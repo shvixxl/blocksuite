@@ -2,6 +2,8 @@ import * as BlockSuite from './index.js';
 
 const schema = new BlockSuite.Schema().register(BlockSuite.AffineSchemas);
 const collection = new BlockSuite.DocCollection({ schema });
+collection.meta.initialize();
+
 const job = new BlockSuite.Job({ collection });
 const editor = new BlockSuite.AffineEditorContainer();
 const doc = collection.createDoc();

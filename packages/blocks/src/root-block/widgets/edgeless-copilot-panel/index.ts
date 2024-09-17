@@ -1,13 +1,15 @@
-import '../../../_common/components/ai-item/ai-item-list.js';
-
 import type { EditorHost } from '@blocksuite/block-std';
+
 import { WithDisposable } from '@blocksuite/block-std';
-import { css, html, LitElement, nothing } from 'lit';
+import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
 import type { AIItemGroupConfig } from '../../../_common/components/ai-item/types.js';
-import { on, stopPropagation } from '../../../_common/utils/event.js';
 import type { EdgelessRootBlockComponent } from '../../edgeless/edgeless-root-block.js';
+
+import '../../../_common/components/ai-item/ai-item-list.js';
+import { scrollbarStyle } from '../../../_common/components/utils.js';
+import { on, stopPropagation } from '../../../_common/utils/event.js';
 
 @customElement('edgeless-copilot-panel')
 export class EdgelessCopilotPanel extends WithDisposable(LitElement) {
@@ -19,7 +21,7 @@ export class EdgelessCopilotPanel extends WithDisposable(LitElement) {
 
     .edgeless-copilot-panel {
       box-sizing: border-box;
-      padding: 8px;
+      padding: 8px 4px 8px 8px;
       min-width: 330px;
       max-height: 374px;
       overflow-y: auto;
@@ -29,35 +31,11 @@ export class EdgelessCopilotPanel extends WithDisposable(LitElement) {
       z-index: var(--affine-z-index-popover);
     }
 
-    .edgeless-copilot-panel::-webkit-scrollbar {
-      width: 5px;
-      max-height: 40px;
-    }
-    .edgeless-copilot-panel::-webkit-scrollbar-thumb {
-      border-radius: 20px;
-    }
+    ${scrollbarStyle('.edgeless-copilot-panel')}
     .edgeless-copilot-panel:hover::-webkit-scrollbar-thumb {
       background-color: var(--affine-black-30);
     }
-    .edgeless-copilot-panel::-webkit-scrollbar-corner {
-      display: none;
-    }
   `;
-
-  @property({ attribute: false })
-  accessor host!: EditorHost;
-
-  @property({ attribute: false })
-  accessor edgeless!: EdgelessRootBlockComponent;
-
-  @property({ attribute: false })
-  accessor groups!: AIItemGroupConfig[];
-
-  @property({ attribute: false })
-  accessor entry: 'toolbar' | 'selection' | undefined = undefined;
-
-  @property({ attribute: false })
-  accessor onClick: (() => void) | undefined = undefined;
 
   private _getChain() {
     return this.edgeless.service.std.command.chain();
@@ -99,6 +77,21 @@ export class EdgelessCopilotPanel extends WithDisposable(LitElement) {
       </div>
     `;
   }
+
+  @property({ attribute: false })
+  accessor edgeless!: EdgelessRootBlockComponent;
+
+  @property({ attribute: false })
+  accessor entry: 'toolbar' | 'selection' | undefined = undefined;
+
+  @property({ attribute: false })
+  accessor groups!: AIItemGroupConfig[];
+
+  @property({ attribute: false })
+  accessor host!: EditorHost;
+
+  @property({ attribute: false })
+  accessor onClick: (() => void) | undefined = undefined;
 }
 
 declare global {

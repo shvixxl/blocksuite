@@ -15,17 +15,8 @@ export class LeftSidePanel extends ShadowlessElement {
       display: none;
     }
   `;
-  currentContent: HTMLElement | null = null;
 
-  showContent(ele: HTMLElement) {
-    if (this.currentContent) {
-      this.currentContent.remove();
-    }
-    this.style.display = 'block';
-    ele.classList.add('blocksuite-overlay');
-    this.currentContent = ele;
-    this.append(ele);
-  }
+  currentContent: HTMLElement | null = null;
 
   hideContent() {
     if (this.currentContent) {
@@ -35,16 +26,25 @@ export class LeftSidePanel extends ShadowlessElement {
     }
   }
 
+  protected override render(): unknown {
+    return html``;
+  }
+
+  showContent(ele: HTMLElement) {
+    if (this.currentContent) {
+      this.currentContent.remove();
+    }
+    this.style.display = 'block';
+    this.currentContent = ele;
+    this.append(ele);
+  }
+
   toggle(ele: HTMLElement) {
     if (this.currentContent !== ele) {
       this.showContent(ele);
     } else {
       this.hideContent();
     }
-  }
-
-  protected override render(): unknown {
-    return html``;
   }
 }
 

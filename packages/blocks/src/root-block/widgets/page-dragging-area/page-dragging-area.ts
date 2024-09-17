@@ -1,14 +1,16 @@
 import type { PointerEventState } from '@blocksuite/block-std';
-import { BlockElement } from '@blocksuite/block-std';
-import { WidgetElement } from '@blocksuite/block-std';
-import { assertExists, assertInstanceOf } from '@blocksuite/global/utils';
+
+import { BlockComponent, WidgetComponent } from '@blocksuite/block-std';
+import { assertInstanceOf } from '@blocksuite/global/utils';
 import { html, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
+import type { PageRootBlockComponent, RootBlockModel } from '../../index.js';
+
 import { BLOCK_ID_ATTR } from '../../../_common/consts.js';
 import { matchFlavours } from '../../../_common/utils/model.js';
-import type { PageRootBlockComponent, RootBlockModel } from '../../index.js';
+import { getScrollContainer } from '../../../_common/utils/scroll-container.js';
 import { autoScroll } from '../../text-selection/utils.js';
 
 type Rect = {
@@ -19,7 +21,7 @@ type Rect = {
 };
 
 type BlockInfo = {
-  element: BlockElement;
+  element: BlockComponent;
   rect: Rect;
 };
 
@@ -27,28 +29,11 @@ export const AFFINE_PAGE_DRAGGING_AREA_WIDGET =
   'affine-page-dragging-area-widget';
 
 @customElement(AFFINE_PAGE_DRAGGING_AREA_WIDGET)
-export class AffinePageDraggingAreaWidget extends WidgetElement<
+export class AffinePageDraggingAreaWidget extends WidgetComponent<
   RootBlockModel,
   PageRootBlockComponent
 > {
-  @state()
-  accessor rect: Rect | null = null;
-
-  private _rafID = 0;
-
-  static excludeFlavours: string[] = ['affine:note', 'affine:surface'];
-
-  private _lastPointerState: PointerEventState | null = null;
-
   private _dragging = false;
-
-  private _initialScrollOffset: {
-    top: number;
-    left: number;
-  } = {
-    top: 0,
-    left: 0,
-  };
 
   private _initialContainerOffset: {
     x: number;
@@ -58,76 +43,17 @@ export class AffinePageDraggingAreaWidget extends WidgetElement<
     y: 0,
   };
 
-  private get _viewportElement() {
-    const rootElement = this.blockElement;
-    assertExists(rootElement);
-    return rootElement.viewportElement;
-  }
+  private _initialScrollOffset: {
+    top: number;
+    left: number;
+  } = {
+    top: 0,
+    left: 0,
+  };
 
-  private get _viewport() {
-    const rootElement = this.blockElement;
-    assertExists(rootElement);
-    return rootElement.viewport;
-  }
+  private _lastPointerState: PointerEventState | null = null;
 
-  private get _allBlocksWithRect(): BlockInfo[] {
-    const { scrollLeft, scrollTop } = this._viewport;
-
-    const getAllNodeFromTree = (): BlockElement[] => {
-      const blockElement: BlockElement[] = [];
-      this.host.view.walkThrough(node => {
-        const view = node;
-        if (!(view instanceof BlockElement)) {
-          return true;
-        }
-        if (
-          view.model.role !== 'root' &&
-          !AffinePageDraggingAreaWidget.excludeFlavours.includes(
-            view.model.flavour
-          )
-        ) {
-          blockElement.push(view);
-        }
-        return;
-      });
-      return blockElement;
-    };
-
-    const elements = getAllNodeFromTree();
-
-    return elements.map(element => {
-      const bounding = element.getBoundingClientRect();
-      return {
-        element,
-        rect: {
-          left: bounding.left + scrollLeft,
-          top: bounding.top + scrollTop,
-          width: bounding.width,
-          height: bounding.height,
-        },
-      };
-    });
-  }
-
-  private _selectBlocksByRect(userRect: Rect) {
-    const selections = getSelectingBlockPaths(
-      this._allBlocksWithRect,
-      userRect
-    ).map(blockPath => {
-      return this.host.selection.create('block', {
-        blockId: blockPath,
-      });
-    });
-
-    this.host.selection.setGroup('note', selections);
-  }
-
-  private _clearRaf() {
-    if (this._rafID) {
-      cancelAnimationFrame(this._rafID);
-      this._rafID = 0;
-    }
-  }
+  private _rafID = 0;
 
   private _updateDraggingArea = (
     state: PointerEventState,
@@ -137,6 +63,9 @@ export class AffinePageDraggingAreaWidget extends WidgetElement<
     const { x: startX, y: startY } = state.start;
 
     const { left: initScrollX, top: initScrollY } = this._initialScrollOffset;
+    if (!this._viewport) {
+      return;
+    }
     const { scrollLeft, scrollTop, scrollWidth, scrollHeight } = this._viewport;
 
     const { x: initConX, y: initConY } = this._initialContainerOffset;
@@ -181,14 +110,88 @@ export class AffinePageDraggingAreaWidget extends WidgetElement<
     this._lastPointerState = state;
 
     if (shouldAutoScroll) {
-      const rect = this._viewportElement.getBoundingClientRect();
-      const result = autoScroll(this._viewportElement, state.raw.y - rect.top);
+      const rect = this.scrollContainer.getBoundingClientRect();
+      const result = autoScroll(this.scrollContainer, state.raw.y - rect.top);
       if (!result) {
         this._clearRaf();
         return;
       }
     }
   };
+
+  static excludeFlavours: string[] = ['affine:note', 'affine:surface'];
+
+  private get _allBlocksWithRect(): BlockInfo[] {
+    if (!this._viewport) {
+      return [];
+    }
+    const { scrollLeft, scrollTop } = this._viewport;
+
+    const getAllNodeFromTree = (): BlockComponent[] => {
+      const blocks: BlockComponent[] = [];
+      this.host.view.walkThrough(node => {
+        const view = node;
+        if (!(view instanceof BlockComponent)) {
+          return true;
+        }
+        if (
+          view.model.role !== 'root' &&
+          !AffinePageDraggingAreaWidget.excludeFlavours.includes(
+            view.model.flavour
+          )
+        ) {
+          blocks.push(view);
+        }
+        return;
+      });
+      return blocks;
+    };
+
+    const elements = getAllNodeFromTree();
+
+    return elements.map(element => {
+      const bounding = element.getBoundingClientRect();
+      return {
+        element,
+        rect: {
+          left: bounding.left + scrollLeft,
+          top: bounding.top + scrollTop,
+          width: bounding.width,
+          height: bounding.height,
+        },
+      };
+    });
+  }
+
+  private _clearRaf() {
+    if (this._rafID) {
+      cancelAnimationFrame(this._rafID);
+      this._rafID = 0;
+    }
+  }
+
+  private _selectBlocksByRect(userRect: Rect) {
+    const selections = getSelectingBlockPaths(
+      this._allBlocksWithRect,
+      userRect
+    ).map(blockPath => {
+      return this.host.selection.create('block', {
+        blockId: blockPath,
+      });
+    });
+
+    this.host.selection.setGroup('note', selections);
+  }
+
+  private get _viewport() {
+    const rootComponent = this.block;
+    if (!rootComponent) return;
+    return rootComponent.viewport;
+  }
+
+  private get scrollContainer() {
+    return getScrollContainer(this.block);
+  }
 
   override connectedCallback() {
     super.connectedCallback();
@@ -198,8 +201,10 @@ export class AffinePageDraggingAreaWidget extends WidgetElement<
         const state = ctx.get('pointerState');
         const { button } = state.raw;
         if (button !== 0) return;
-
         if (isDragArea(state)) {
+          if (!this._viewport) {
+            return;
+          }
           this._dragging = true;
           const { scrollLeft, scrollTop } = this._viewport;
           this._initialScrollOffset = {
@@ -224,8 +229,13 @@ export class AffinePageDraggingAreaWidget extends WidgetElement<
         if (!this._dragging) {
           return;
         }
-        ctx.get('defaultState').event.preventDefault();
+
         const state = ctx.get('pointerState');
+        // TODO(@L-Sun) support drag area for touch device
+        if (state.raw.pointerType === 'touch') return;
+
+        ctx.get('defaultState').event.preventDefault();
+
         this._rafID = requestAnimationFrame(() => {
           this._updateDraggingArea(state, true);
         });
@@ -270,8 +280,14 @@ export class AffinePageDraggingAreaWidget extends WidgetElement<
     );
   }
 
+  override disconnectedCallback() {
+    this._clearRaf();
+    this._disposables.dispose();
+    super.disconnectedCallback();
+  }
+
   override firstUpdated() {
-    this._disposables.addFromEvent(this._viewportElement, 'scroll', () => {
+    this._disposables.addFromEvent(this.scrollContainer, 'scroll', () => {
       if (!this._dragging || !this._lastPointerState) return;
 
       const state = this._lastPointerState;
@@ -279,12 +295,6 @@ export class AffinePageDraggingAreaWidget extends WidgetElement<
         this._updateDraggingArea(state, false);
       });
     });
-  }
-
-  override disconnectedCallback() {
-    this._clearRaf();
-    this._disposables.dispose();
-    super.disconnectedCallback();
   }
 
   override render() {
@@ -309,6 +319,9 @@ export class AffinePageDraggingAreaWidget extends WidgetElement<
       <div class="affine-page-dragging-area" style=${styleMap(style)}></div>
     `;
   }
+
+  @state()
+  accessor rect: Rect | null = null;
 }
 
 function rectIntersects(a: Rect, b: Rect) {
@@ -344,7 +357,7 @@ function filterBlockInfosByParent(
   const targetBlock = parentInfos.element;
   let results = [parentInfos];
   if (targetBlock.childElementCount > 0) {
-    const childBlockInfos = targetBlock.childBlockElements
+    const childBlockInfos = targetBlock.childBlocks
       .map(el =>
         filteredBlockInfos.find(
           blockInfo => blockInfo.element.model.id === el.model.id
@@ -425,7 +438,7 @@ function getSelectingBlockPaths(blockInfos: BlockInfo[], userRect: Rect) {
 function isDragArea(e: PointerEventState) {
   const el = e.raw.target;
   assertInstanceOf(el, Element);
-  const block = el.closest<BlockElement>(`[${BLOCK_ID_ATTR}]`);
+  const block = el.closest<BlockComponent>(`[${BLOCK_ID_ATTR}]`);
   return block && matchFlavours(block.model, ['affine:page', 'affine:note']);
 }
 

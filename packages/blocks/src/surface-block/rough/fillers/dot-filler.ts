@@ -1,7 +1,8 @@
 import type { Op, OpSet, ResolvedOptions } from '../core.js';
 import type { Line, Point } from '../geometry.js';
-import { lineLength } from '../geometry.js';
 import type { PatternFiller, RenderHelper } from './filler-interface.js';
+
+import { lineLength } from '../geometry.js';
 import { polygonHachureLines } from './scan-line-hachure.js';
 
 export class DotFiller implements PatternFiller {
@@ -9,12 +10,6 @@ export class DotFiller implements PatternFiller {
 
   constructor(helper: RenderHelper) {
     this.helper = helper;
-  }
-
-  fillPolygons(polygonList: Point[][], o: ResolvedOptions): OpSet {
-    o = Object.assign({}, o, { hachureAngle: 0 });
-    const lines = polygonHachureLines(polygonList, o);
-    return this.dotsOnLines(lines, o);
   }
 
   private dotsOnLines(lines: Line[], o: ResolvedOptions): OpSet {
@@ -46,5 +41,11 @@ export class DotFiller implements PatternFiller {
       }
     }
     return { type: 'fillSketch', ops };
+  }
+
+  fillPolygons(polygonList: Point[][], o: ResolvedOptions): OpSet {
+    o = Object.assign({}, o, { hachureAngle: 0 });
+    const lines = polygonHachureLines(polygonList, o);
+    return this.dotsOnLines(lines, o);
   }
 }

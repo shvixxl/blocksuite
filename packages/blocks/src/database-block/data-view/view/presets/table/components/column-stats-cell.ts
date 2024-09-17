@@ -1,18 +1,19 @@
 import { WithDisposable } from '@blocksuite/block-std';
-import { css, html, LitElement } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
-import { positionToVRect } from '../../../../../../_common/components/index.js';
+import type { GroupData } from '../../../../common/group-by/helper.js';
+import type { TableColumn } from '../table-view-manager.js';
+
 import { ArrowDownIcon } from '../../../../../../_common/icons/index.js';
 import { getRootByElement } from '../../../../../../_common/utils/index.js';
 import {
   type ColumnDataType,
-  getStatCalcOperationFromType,
   type StatCalcOp,
   type StatOpResult,
+  getStatCalcOperationFromType,
 } from '../stat-ops.js';
-import type { DataViewTableColumnManager } from '../table-view-manager.js';
 import { DEFAULT_COLUMN_MIN_WIDTH } from './../consts.js';
 import { popColStatOperationMenu } from './menu.js';
 
@@ -55,14 +56,44 @@ const styles = css`
 export class DatabaseColumnStatsCell extends WithDisposable(LitElement) {
   static override styles = styles;
 
-  @property({ attribute: false })
-  accessor column!: DataViewTableColumnManager;
+  onSelect = (operation: StatCalcOp) => {
+    if (operation.type === 'none') {
+      this.operation = null;
+      this.result = null;
+      return;
+    }
+    this.column.updateStatCalcOp(operation.type);
+    this.operation = operation;
+    this.calculate();
+  };
 
-  @state()
-  private accessor operation: StatCalcOp | null = null;
+  openMenu = (ev: MouseEvent) => {
+    const rootComponent = getRootByElement(this);
+    popColStatOperationMenu(
+      rootComponent,
+      ev.target as HTMLElement,
+      this.column,
+      this.getColumnType(),
+      this.onSelect
+    );
+  };
 
-  @state()
-  private accessor result: StatOpResult | null = null;
+  private getResultString() {
+    if (!this.result || !isFinite(this.result.value)) return '';
+    const { displayFormat: df, value } = this.result;
+
+    switch (df) {
+      case '%':
+        return `${(value * 100).toFixed(3)}%`;
+      case 'x10':
+        return `${value}`;
+    }
+  }
+
+  calculate() {
+    if (!this.operation) return;
+    this.result = this.operation.calculate(this.column, this.group);
+  }
 
   override connectedCallback(): void {
     super.connectedCallback();
@@ -70,26 +101,17 @@ export class DatabaseColumnStatsCell extends WithDisposable(LitElement) {
     this.calculate();
 
     this.disposables.addFromEvent(this, 'click', this.openMenu);
+  }
 
-    const view = this.column.dataViewManager;
-    this.disposables.add(
-      view.slots.update.on(() => {
-        this.calculate();
-      })
-    );
-
-    view.rows.forEach(rowId => {
-      this._disposables.add(
-        this.column.onCellUpdate(rowId, () => {
-          this.calculate();
-        })
-      );
-    });
+  getColumnType(): ColumnDataType {
+    const type = this.column.type;
+    if (type === 'number' || type === 'checkbox') return type;
+    return 'other';
   }
 
   protected override render() {
     const style = {
-      width: `${this.column.width}px`,
+      width: `${this.column.width$.value}px`,
     };
     return html`<div
       calculated="${!!this.operation && this.operation.type !== 'none'}"
@@ -107,50 +129,17 @@ export class DatabaseColumnStatsCell extends WithDisposable(LitElement) {
     </div>`;
   }
 
-  private getResultString() {
-    if (!this.result || !isFinite(this.result.value)) return '';
-    const { displayFormat: df, value } = this.result;
+  @property({ attribute: false })
+  accessor column!: TableColumn;
 
-    switch (df) {
-      case '%':
-        return `${(value * 100).toFixed(3)}%`;
-      case 'x10':
-        return `${value}`;
-    }
-  }
+  @property({ attribute: false })
+  accessor group: GroupData | undefined = undefined;
 
-  openMenu = (ev: MouseEvent) => {
-    const rootElement = getRootByElement(this);
-    popColStatOperationMenu(
-      rootElement,
-      positionToVRect(ev.x, ev.y),
-      this.column,
-      this.getColumnType(),
-      this.onSelect
-    );
-  };
+  @state()
+  private accessor operation: StatCalcOp | null = null;
 
-  onSelect = (operation: StatCalcOp) => {
-    if (operation.type === 'none') {
-      this.operation = null;
-      this.result = null;
-      return;
-    }
-    this.column.updateStatCalcOp(operation.type);
-    this.operation = operation;
-    this.calculate();
-  };
-
-  calculate() {
-    if (!this.operation) return;
-    this.result = this.operation.calculate(this.column);
-  }
-
-  getColumnType(): ColumnDataType {
-    const type = this.column.type;
-    if (type === 'number' || type === 'checkbox') return type;
-    return 'other';
-  }
+  @state()
+  private accessor result: StatOpResult | null = null;
 }
 
 declare global {

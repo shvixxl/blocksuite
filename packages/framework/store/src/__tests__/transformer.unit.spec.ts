@@ -5,11 +5,11 @@ import { MemoryBlobCRUD } from '../adapter/index.js';
 import { Text } from '../reactive/index.js';
 import {
   type BlockModel,
-  defineBlockSchema,
   Schema,
   type SchemaToModel,
+  defineBlockSchema,
 } from '../schema/index.js';
-import { DocCollection, Generator } from '../store/index.js';
+import { DocCollection, IdGeneratorType } from '../store/index.js';
 import { AssetsManager, BaseBlockTransformer } from '../transformer/index.js';
 
 const docSchema = defineBlockSchema({
@@ -44,7 +44,7 @@ const docSchema = defineBlockSchema({
 type RootBlockModel = SchemaToModel<typeof docSchema>;
 
 function createTestOptions() {
-  const idGenerator = Generator.AutoIncrement;
+  const idGenerator = IdGeneratorType.AutoIncrement;
   const schema = new Schema();
   schema.register([docSchema]);
   return { id: 'test-collection', idGenerator, schema };
@@ -57,6 +57,7 @@ const assets = new AssetsManager({ blob: blobCRUD });
 test('model to snapshot', () => {
   const options = createTestOptions();
   const collection = new DocCollection(options);
+  collection.meta.initialize();
   const doc = collection.createDoc({ id: 'home' });
   doc.load();
   doc.addBlock('page');
@@ -73,6 +74,7 @@ test('model to snapshot', () => {
 test('snapshot to model', async () => {
   const options = createTestOptions();
   const collection = new DocCollection(options);
+  collection.meta.initialize();
   const doc = collection.createDoc({ id: 'home' });
   doc.load();
   doc.addBlock('page');

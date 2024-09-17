@@ -14,10 +14,32 @@ type ChannelMessage =
     };
 
 export class BroadcastChannelDocSource implements DocSource {
-  name = 'broadcast-channel';
+  private _onMessage = (event: MessageEvent<ChannelMessage>) => {
+    if (event.data.type === 'init') {
+      for (const [docId, data] of this.docMap) {
+        this.channel.postMessage({
+          type: 'update',
+          docId,
+          data,
+        } satisfies ChannelMessage);
+      }
+      return;
+    }
+
+    const { docId, data } = event.data;
+    const update = this.docMap.get(docId);
+    if (update) {
+      this.docMap.set(docId, mergeUpdates([update, data]));
+    } else {
+      this.docMap.set(docId, data);
+    }
+  };
 
   channel = new BroadcastChannel(this.channelName);
+
   docMap = new Map<string, Uint8Array>();
+
+  name = 'broadcast-channel';
 
   constructor(readonly channelName: string = 'blocksuite:doc') {
     this.channel.addEventListener('message', this._onMessage);
@@ -66,25 +88,4 @@ export class BroadcastChannelDocSource implements DocSource {
       abortController.abort();
     };
   }
-
-  private _onMessage = (event: MessageEvent<ChannelMessage>) => {
-    if (event.data.type === 'init') {
-      for (const [docId, data] of this.docMap) {
-        this.channel.postMessage({
-          type: 'update',
-          docId,
-          data,
-        } satisfies ChannelMessage);
-      }
-      return;
-    }
-
-    const { docId, data } = event.data;
-    const update = this.docMap.get(docId);
-    if (update) {
-      this.docMap.set(docId, mergeUpdates([update, data]));
-    } else {
-      this.docMap.set(docId, data);
-    }
-  };
 }

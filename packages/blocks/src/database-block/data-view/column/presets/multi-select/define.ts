@@ -1,11 +1,12 @@
-import { nanoid, Text } from '@blocksuite/store';
+import { Text, nanoid } from '@blocksuite/store';
+
+import type { SelectTag } from '../../../utils/tags/multi-tag-select.js';
+import type { SelectColumnData } from '../../types.js';
 
 import { tTag } from '../../../logical/data-type.js';
 import { tArray } from '../../../logical/typesystem.js';
 import { getTagColor } from '../../../utils/tags/colors.js';
-import type { SelectTag } from '../../../utils/tags/multi-tag-select.js';
 import { columnType } from '../../column-config.js';
-import type { SelectColumnData } from '../../types.js';
 
 export const multiSelectColumnType = columnType('multi-select');
 declare global {
@@ -68,6 +69,7 @@ export const multiSelectColumnModelConfig = multiSelectColumnType.modelConfig<
     };
   },
   cellToJson: data => data ?? null,
+  isEmpty: data => data == null || data.length === 0,
 });
 multiSelectColumnModelConfig.addConvert('select', (column, cells) => ({
   column,

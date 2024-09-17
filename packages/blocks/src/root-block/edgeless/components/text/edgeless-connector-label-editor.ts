@@ -1,10 +1,9 @@
-import '../../../../_common/components/rich-text/rich-text.js';
-
 import {
   RangeManager,
   ShadowlessElement,
   WithDisposable,
 } from '@blocksuite/block-std';
+import { Bound, Vec } from '@blocksuite/global/utils';
 import { assertExists } from '@blocksuite/global/utils';
 import { DocCollection } from '@blocksuite/store';
 import { css, html, nothing } from 'lit';
@@ -12,15 +11,13 @@ import { customElement, property, query } from 'lit/decorators.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
 import type { RichText } from '../../../../_common/components/rich-text/rich-text.js';
-import { isCssVariable } from '../../../../_common/theme/css-variables.js';
+import type { ConnectorElementModel } from '../../../../surface-block/index.js';
+import type { EdgelessRootBlockComponent } from '../../edgeless-root-block.js';
+
+import '../../../../_common/components/rich-text/rich-text.js';
+import { ThemeObserver } from '../../../../_common/theme/theme-observer.js';
 import { almostEqual } from '../../../../_common/utils/math.js';
 import { getLineHeight } from '../../../../surface-block/canvas-renderer/element-renderer/text/utils.js';
-import {
-  Bound,
-  type ConnectorElementModel,
-  Vec,
-} from '../../../../surface-block/index.js';
-import type { EdgelessRootBlockComponent } from '../../edgeless-root-block.js';
 
 const HORIZONTAL_PADDING = 2;
 const VERTICAL_PADDING = 2;
@@ -30,64 +27,11 @@ const BORDER_WIDTH = 1;
 export class EdgelessConnectorLabelEditor extends WithDisposable(
   ShadowlessElement
 ) {
-  static override styles = css`
-    .edgeless-connector-label-editor {
-      position: absolute;
-      left: 0;
-      top: 0;
-      transform-origin: center;
-      z-index: 10;
-      padding: ${VERTICAL_PADDING}px ${HORIZONTAL_PADDING}px;
-      border: ${BORDER_WIDTH}px solid var(--affine-primary-color, #1e96eb);
-      background: var(--affine-background-primary-color, #fff);
-      border-radius: 2px;
-      box-shadow: 0px 0px 0px 2px rgba(30, 150, 235, 0.3);
-      box-sizing: border-box;
-      overflow: visible;
-    }
-
-    .inline-editor {
-      white-space: pre-wrap !important;
-      outline: none;
-    }
-
-    .inline-editor span {
-      word-break: normal !important;
-      overflow-wrap: anywhere !important;
-    }
-
-    .edgeless-connector-label-editor-placeholder {
-      pointer-events: none;
-      color: var(--affine-text-disable-color);
-      white-space: nowrap;
-    }
-  `;
-
-  @query('rich-text')
-  accessor richText!: RichText;
-
-  @property({ attribute: false })
-  accessor connector!: ConnectorElementModel;
-
-  @property({ attribute: false })
-  accessor edgeless!: EdgelessRootBlockComponent;
-
-  get inlineEditor() {
-    assertExists(this.richText.inlineEditor);
-    return this.richText.inlineEditor;
-  }
-
-  get inlineEditorContainer() {
-    return this.inlineEditor.rootElement;
-  }
+  private _isComposition = false;
 
   private _keeping = false;
-  private _isComposition = false;
-  private _resizeObserver: ResizeObserver | null = null;
 
-  setKeeping(keeping: boolean) {
-    this._keeping = keeping;
-  }
+  private _resizeObserver: ResizeObserver | null = null;
 
   private _updateLabelRect = () => {
     const { connector, edgeless } = this;
@@ -110,6 +54,39 @@ export class EdgelessConnectorLabelEditor extends WithDisposable(
       });
     }
   };
+
+  static override styles = css`
+    .edgeless-connector-label-editor {
+      position: absolute;
+      left: 0;
+      top: 0;
+      transform-origin: center;
+      z-index: 10;
+      padding: ${VERTICAL_PADDING}px ${HORIZONTAL_PADDING}px;
+      border: ${BORDER_WIDTH}px solid var(--affine-primary-color, #1e96eb);
+      background: var(--affine-background-primary-color, #fff);
+      border-radius: 2px;
+      box-shadow: 0px 0px 0px 2px rgba(30, 150, 235, 0.3);
+      box-sizing: border-box;
+      overflow: visible;
+
+      .inline-editor {
+        white-space: pre-wrap !important;
+        outline: none;
+      }
+
+      .inline-editor span {
+        word-break: normal !important;
+        overflow-wrap: anywhere !important;
+      }
+
+      .edgeless-connector-label-editor-placeholder {
+        pointer-events: none;
+        color: var(--affine-text-disable-color);
+        white-space: nowrap;
+      }
+    }
+  `;
 
   override connectedCallback() {
     super.connectedCallback();
@@ -140,6 +117,27 @@ export class EdgelessConnectorLabelEditor extends WithDisposable(
         this.inlineEditor.slots.renderComplete.on(() => {
           this.requestUpdate();
         });
+
+        this.disposables.add(
+          dispatcher.add('keyDown', ctx => {
+            const state = ctx.get('keyboardState');
+            const { key, ctrlKey, metaKey, altKey, shiftKey, isComposing } =
+              state.raw;
+            const onlyCmd = (ctrlKey || metaKey) && !altKey && !shiftKey;
+            const isModEnter = onlyCmd && key === 'Enter';
+            const isEscape = key === 'Escape';
+            if (!isComposing && (isModEnter || isEscape)) {
+              this.inlineEditorContainer.blur();
+
+              edgeless.service.selection.set({
+                elements: [connector.id],
+                editing: false,
+              });
+              return true;
+            }
+            return false;
+          })
+        );
 
         this.disposables.add(
           edgeless.service.surface.elementUpdated.on(({ id }) => {
@@ -231,13 +229,13 @@ export class EdgelessConnectorLabelEditor extends WithDisposable(
         fontSize,
         fontStyle,
         fontWeight,
-        color,
         textAlign,
+        color: labelColor,
       },
       labelConstraints: { hasMaxWidth, maxWidth },
     } = connector;
 
-    const lineHeight = getLineHeight(fontFamily, fontSize);
+    const lineHeight = getLineHeight(fontFamily, fontSize, fontWeight);
     const { translateX, translateY, zoom } = this.edgeless.service.viewport;
     const [x, y] = Vec.mul(connector.getPointByOffsetDistance(distance), zoom);
     const transformOperation = [
@@ -248,6 +246,7 @@ export class EdgelessConnectorLabelEditor extends WithDisposable(
     ];
 
     const isEmpty = !connector.text!.length && !this._isComposition;
+    const color = ThemeObserver.generateColorProperty(labelColor, '#000000');
 
     return html`
       <div
@@ -262,7 +261,7 @@ export class EdgelessConnectorLabelEditor extends WithDisposable(
           maxWidth: hasMaxWidth
             ? `${maxWidth + BORDER_WIDTH * 2 + HORIZONTAL_PADDING * 2}px`
             : 'initial',
-          color: isCssVariable(color) ? `var(${color})` : color,
+          color,
           transform: transformOperation.join(' '),
         })}
       >
@@ -288,6 +287,28 @@ export class EdgelessConnectorLabelEditor extends WithDisposable(
       </div>
     `;
   }
+
+  setKeeping(keeping: boolean) {
+    this._keeping = keeping;
+  }
+
+  get inlineEditor() {
+    assertExists(this.richText.inlineEditor);
+    return this.richText.inlineEditor;
+  }
+
+  get inlineEditorContainer() {
+    return this.inlineEditor.rootElement;
+  }
+
+  @property({ attribute: false })
+  accessor connector!: ConnectorElementModel;
+
+  @property({ attribute: false })
+  accessor edgeless!: EdgelessRootBlockComponent;
+
+  @query('rich-text')
+  accessor richText!: RichText;
 }
 
 declare global {

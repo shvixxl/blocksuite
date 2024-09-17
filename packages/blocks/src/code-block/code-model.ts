@@ -1,5 +1,6 @@
-import { defineBlockSchema, type SchemaToModel } from '@blocksuite/store';
 import type { BundledLanguage, Highlighter, PlainTextLanguage } from 'shiki';
+
+import { type SchemaToModel, defineBlockSchema } from '@blocksuite/store';
 
 import { FALLBACK_LANG } from './utils/consts.js';
 
@@ -14,7 +15,12 @@ export const CodeBlockSchema = defineBlockSchema({
   metadata: {
     version: 1,
     role: 'content',
-    parent: ['affine:note', 'affine:paragraph', 'affine:list'],
+    parent: [
+      'affine:note',
+      'affine:paragraph',
+      'affine:list',
+      'affine:edgeless-text',
+    ],
     children: [],
   },
 });

@@ -1,6 +1,24 @@
+import type {
+  BaseElementProps,
+  PointTestOptions,
+} from '@blocksuite/block-std/gfx';
+import type {
+  Bound,
+  IBound,
+  IVec,
+  PointLocation,
+  SerializedXYWH,
+} from '@blocksuite/global/utils';
+
+import {
+  GfxPrimitiveElementModel,
+  local,
+  yfield,
+} from '@blocksuite/block-std/gfx';
 import { DocCollection, type Y } from '@blocksuite/store';
 
 import {
+  type Color,
   DEFAULT_ROUGHNESS,
   FontFamily,
   FontStyle,
@@ -8,18 +26,9 @@ import {
   StrokeStyle,
   TextAlign,
   TextResizing,
+  type TextStyleProps,
   TextVerticalAlign,
 } from '../consts.js';
-import type { IBound, SerializedXYWH } from '../index.js';
-import type { Bound } from '../utils/bound.js';
-import type { PointLocation } from '../utils/point-location.js';
-import { type IVec2 } from '../utils/vec.js';
-import {
-  type IBaseProps,
-  type IHitTestOptions,
-  SurfaceElementModel,
-} from './base.js';
-import { local, yfield } from './decorators.js';
 import { diamond } from './utils/shape/diamond.js';
 import { ellipse } from './utils/shape/ellipse.js';
 import { rect } from './utils/shape/rect.js';
@@ -38,38 +47,37 @@ export type ShapeType = 'rect' | 'triangle' | 'ellipse' | 'diamond';
 export type ShapeStyle = 'General' | 'Scribbled';
 
 export enum ShapeTextFontSize {
-  SMALL = 12,
-  MEDIUM = 20,
   LARGE = 28,
+  MEDIUM = 20,
+  SMALL = 12,
   XLARGE = 36,
 }
 
-export type ShapeProps = IBaseProps & {
+export type ShapeProps = BaseElementProps & {
   shapeType: ShapeType;
   radius: number;
   filled: boolean;
-  fillColor: string;
+  fillColor: Color;
   strokeWidth: number;
-  strokeColor: string;
+  strokeColor: Color;
   strokeStyle: StrokeStyle;
   shapeStyle: ShapeStyle;
   // https://github.com/rough-stuff/rough/wiki#roughness
   roughness?: number;
 
   text?: Y.Text;
-  color?: string;
-  fontSize?: number;
-  fontFamily?: string;
-  fontWeight?: FontWeight;
-  fontStyle?: FontStyle;
-  textAlign?: TextAlign;
   textHorizontalAlign?: TextAlign;
   textVerticalAlign?: TextVerticalAlign;
   textResizing?: TextResizing;
   maxWidth?: false | number;
-};
+} & Partial<TextStyleProps>;
 
-export class ShapeElementModel extends SurfaceElementModel<ShapeProps> {
+export const SHAPE_TEXT_PADDING = 20;
+export const SHAPE_TEXT_VERTICAL_PADDING = 10;
+
+export class ShapeElementModel extends GfxPrimitiveElementModel<ShapeProps> {
+  textBound: IBound | null = null;
+
   static override propsToY(props: ShapeProps) {
     if (props.text && !(props.text instanceof DocCollection.Y.Text)) {
       props.text = new DocCollection.Y.Text(props.text);
@@ -78,108 +86,124 @@ export class ShapeElementModel extends SurfaceElementModel<ShapeProps> {
     return props;
   }
 
-  get type() {
-    return 'shape';
+  override containsBound(bounds: Bound) {
+    return shapeMethods[this.shapeType].containsBound(bounds, this);
   }
 
-  @local()
-  accessor textDisplay: boolean = true;
+  override getLineIntersections(start: IVec, end: IVec) {
+    return shapeMethods[this.shapeType].getLineIntersections(start, end, this);
+  }
 
-  @yfield()
-  accessor xywh: SerializedXYWH = '[0,0,100,100]';
+  override getNearestPoint(point: IVec): IVec {
+    return shapeMethods[this.shapeType].getNearestPoint(point, this) as IVec;
+  }
 
-  @yfield(0)
-  accessor rotate: number = 0;
+  override getRelativePointLocation(point: IVec): PointLocation {
+    return shapeMethods[this.shapeType].getRelativePointLocation(point, this);
+  }
 
-  @yfield()
-  accessor shapeType: ShapeType = 'rect';
-
-  @yfield()
-  accessor radius: number = 0;
-
-  @yfield()
-  accessor filled: boolean = false;
-
-  @yfield()
-  accessor fillColor: string = '--affine-palette-shape-yellow';
-
-  @yfield()
-  accessor strokeWidth: number = 4;
-
-  @yfield()
-  accessor strokeColor: string = '--affine-palette-line-yellow';
-
-  @yfield()
-  accessor strokeStyle: StrokeStyle = StrokeStyle.Solid;
-
-  @yfield('General' as ShapeStyle)
-  accessor shapeStyle: ShapeStyle = 'General';
-
-  @yfield(DEFAULT_ROUGHNESS)
-  accessor roughness: number = DEFAULT_ROUGHNESS;
-
-  @yfield()
-  accessor text: Y.Text | undefined = undefined;
-
-  @yfield('#000000')
-  accessor color!: string;
-
-  @yfield(ShapeTextFontSize.MEDIUM)
-  accessor fontSize!: number;
-
-  @yfield(FontFamily.Inter as string)
-  accessor fontFamily!: string;
-
-  @yfield(FontWeight.Regular as FontWeight)
-  accessor fontWeight!: FontWeight;
-
-  @yfield(FontStyle.Normal as FontStyle)
-  accessor fontStyle!: FontStyle;
-
-  @yfield(TextAlign.Center as TextAlign)
-  accessor textAlign!: TextAlign;
-
-  @yfield(TextAlign.Center as TextAlign)
-  accessor textHorizontalAlign!: TextAlign;
-
-  @yfield(TextVerticalAlign.Center as TextVerticalAlign)
-  accessor textVerticalAlign!: TextVerticalAlign;
-
-  @yfield(TextResizing.AUTO_HEIGHT as TextResizing)
-  accessor textResizing: TextResizing = TextResizing.AUTO_HEIGHT;
-
-  @yfield(false as false | number)
-  accessor maxWidth: false | number = false;
-
-  textBound: IBound | null = null;
-
-  override hitTest(x: number, y: number, options: IHitTestOptions) {
-    return shapeMethods[this.shapeType].hitTest.call(this, x, y, {
+  override includesPoint(x: number, y: number, options: PointTestOptions) {
+    return shapeMethods[this.shapeType].includesPoint.call(this, x, y, {
       ...options,
       ignoreTransparent: options.ignoreTransparent ?? true,
     });
   }
 
-  override containedByBounds(bounds: Bound) {
-    return shapeMethods[this.shapeType].containedByBounds(bounds, this);
+  get type() {
+    return 'shape';
   }
 
-  override intersectWithLine(start: IVec2, end: IVec2) {
-    return shapeMethods[this.shapeType].intersectWithLine(start, end, this);
-  }
+  @yfield('#000000' as Color)
+  accessor color!: Color;
 
-  override getNearestPoint(point: IVec2): IVec2 {
-    return shapeMethods[this.shapeType].getNearestPoint(point, this) as IVec2;
-  }
+  @yfield()
+  accessor fillColor: Color = '--affine-palette-shape-yellow';
 
-  override getRelativePointLocation(point: IVec2): PointLocation {
-    return shapeMethods[this.shapeType].getRelativePointLocation(point, this);
-  }
+  @yfield()
+  accessor filled: boolean = false;
+
+  @yfield(FontFamily.Inter as string)
+  accessor fontFamily!: string;
+
+  @yfield(ShapeTextFontSize.MEDIUM)
+  accessor fontSize!: number;
+
+  @yfield(FontStyle.Normal as FontStyle)
+  accessor fontStyle!: FontStyle;
+
+  @yfield(FontWeight.Regular as FontWeight)
+  accessor fontWeight!: FontWeight;
+
+  @yfield(false as false | number)
+  accessor maxWidth: false | number = false;
+
+  @yfield([SHAPE_TEXT_VERTICAL_PADDING, SHAPE_TEXT_PADDING])
+  accessor padding: [number, number] = [
+    SHAPE_TEXT_VERTICAL_PADDING,
+    SHAPE_TEXT_PADDING,
+  ];
+
+  @yfield()
+  accessor radius: number = 0;
+
+  @yfield(0)
+  accessor rotate: number = 0;
+
+  @yfield(DEFAULT_ROUGHNESS)
+  accessor roughness: number = DEFAULT_ROUGHNESS;
+
+  @yfield()
+  accessor shadow: {
+    blur: number;
+    offsetX: number;
+    offsetY: number;
+    color: string;
+  } | null = null;
+
+  @yfield('General' as ShapeStyle)
+  accessor shapeStyle: ShapeStyle = 'General';
+
+  @yfield()
+  accessor shapeType: ShapeType = 'rect';
+
+  @yfield()
+  accessor strokeColor: Color = '--affine-palette-line-yellow';
+
+  @yfield()
+  accessor strokeStyle: StrokeStyle = StrokeStyle.Solid;
+
+  @yfield()
+  accessor strokeWidth: number = 4;
+
+  @yfield()
+  accessor text: Y.Text | undefined = undefined;
+
+  @yfield(TextAlign.Center as TextAlign)
+  accessor textAlign!: TextAlign;
+
+  @local()
+  accessor textDisplay: boolean = true;
+
+  @yfield(TextAlign.Center as TextAlign)
+  accessor textHorizontalAlign!: TextAlign;
+
+  @yfield(TextResizing.AUTO_HEIGHT as TextResizing)
+  accessor textResizing: TextResizing = TextResizing.AUTO_HEIGHT;
+
+  @yfield(TextVerticalAlign.Center as TextVerticalAlign)
+  accessor textVerticalAlign!: TextVerticalAlign;
+
+  @yfield()
+  accessor xywh: SerializedXYWH = '[0,0,100,100]';
 }
 
 declare global {
   namespace BlockSuite {
     interface SurfaceElementModelMap {
+      shape: ShapeElementModel;
+    }
+
+    interface EdgelessTextModelMap {
       shape: ShapeElementModel;
     }
   }

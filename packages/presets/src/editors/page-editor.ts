@@ -1,3 +1,5 @@
+import type { Doc } from '@blocksuite/store';
+
 import {
   EditorHost,
   ShadowlessElement,
@@ -5,15 +7,16 @@ import {
 } from '@blocksuite/block-std';
 import { PageEditorBlockSpecs } from '@blocksuite/blocks';
 import { noop } from '@blocksuite/global/utils';
-import type { Doc } from '@blocksuite/store';
-import { css, html, nothing } from 'lit';
+import { type TemplateResult, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { createRef, type Ref, ref } from 'lit/directives/ref.js';
+import { type Ref, createRef, ref } from 'lit/directives/ref.js';
 
 noop(EditorHost);
 
 @customElement('page-editor')
 export class PageEditor extends WithDisposable(ShadowlessElement) {
+  private _host: Ref<EditorHost> = createRef<EditorHost>();
+
   static override styles = css`
     page-editor {
       font-family: var(--affine-font-family);
@@ -51,21 +54,6 @@ export class PageEditor extends WithDisposable(ShadowlessElement) {
     }
   `;
 
-  @property({ attribute: false })
-  accessor doc!: Doc;
-
-  @property({ attribute: false })
-  accessor specs = PageEditorBlockSpecs;
-
-  @property({ type: Boolean })
-  accessor hasViewport = true;
-
-  private _host: Ref<EditorHost> = createRef<EditorHost>();
-
-  get host() {
-    return this._host.value as EditorHost;
-  }
-
   override connectedCallback() {
     super.connectedCallback();
     this._disposables.add(
@@ -75,7 +63,7 @@ export class PageEditor extends WithDisposable(ShadowlessElement) {
 
   override async getUpdateComplete(): Promise<boolean> {
     const result = await super.getUpdateComplete();
-    await this.host.updateComplete;
+    await this.host?.updateComplete;
     return result;
   }
 
@@ -96,6 +84,22 @@ export class PageEditor extends WithDisposable(ShadowlessElement) {
       </div>
     `;
   }
+
+  get host() {
+    return this._host.value;
+  }
+
+  @property({ attribute: false })
+  accessor doc!: Doc;
+
+  @property({ attribute: false })
+  accessor editor!: TemplateResult;
+
+  @property({ type: Boolean })
+  accessor hasViewport = true;
+
+  @property({ attribute: false })
+  accessor specs = PageEditorBlockSpecs;
 }
 
 declare global {

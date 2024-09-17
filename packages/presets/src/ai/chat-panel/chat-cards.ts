@@ -1,17 +1,20 @@
 import type { BaseSelection, EditorHost } from '@blocksuite/block-std';
-import { WithDisposable } from '@blocksuite/block-std';
 import type { CopilotSelectionController } from '@blocksuite/blocks';
+import type { BlockModel } from '@blocksuite/store';
+
+import { WithDisposable } from '@blocksuite/block-std';
 import {
   type ImageBlockModel,
   type NoteBlockModel,
   NoteDisplayMode,
 } from '@blocksuite/blocks';
 import { debounce } from '@blocksuite/global/utils';
-import type { BlockModel } from '@blocksuite/store';
-import { css, html, LitElement, nothing, type PropertyValues } from 'lit';
+import { LitElement, type PropertyValues, css, html, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { styleMap } from 'lit/directives/style-map.js';
+
+import type { ChatContextValue } from './chat-context.js';
 
 import {
   CurrentSelectionIcon,
@@ -25,7 +28,6 @@ import {
   getTextContentFromBlockModels,
   selectedToCanvas,
 } from '../utils/selection-utils.js';
-import type { ChatContextValue } from './chat-context.js';
 
 const cardsStyles = css`
   .card-wrapper {
@@ -191,94 +193,6 @@ export class ChatCards extends WithDisposable(LitElement) {
     }
   `;
 
-  @property({ attribute: false })
-  accessor host!: EditorHost;
-
-  @property({ attribute: false })
-  accessor chatContextValue!: ChatContextValue;
-
-  @property({ attribute: false })
-  accessor updateContext!: (context: Partial<ChatContextValue>) => void;
-
-  @property({ attribute: false })
-  accessor selectionValue: BaseSelection[] = [];
-
-  @state()
-  accessor text: string = '';
-
-  @state()
-  accessor markdown: string = '';
-
-  @state()
-  accessor images: File[] = [];
-
-  @state()
-  accessor caption: string = '';
-
-  private _onEdgelessCopilotAreaUpdated() {
-    if (!this.host.closest('edgeless-editor')) return;
-    const edgeless = getEdgelessRootFromEditor(this.host);
-
-    const copilotSelectionTool = edgeless.tools.controllers
-      .copilot as CopilotSelectionController;
-
-    this._disposables.add(
-      copilotSelectionTool.draggingAreaUpdated.on(
-        debounce(() => {
-          selectedToCanvas(this.host)
-            .then(canvas => {
-              canvas?.toBlob(blob => {
-                if (!blob) return;
-                const file = new File([blob], 'selected.png');
-                this.images = [file];
-              });
-            })
-            .catch(console.error);
-        }, 300)
-      )
-    );
-  }
-
-  protected override async updated(_changedProperties: PropertyValues) {
-    if (_changedProperties.has('selectionValue')) {
-      await this._updateState();
-    }
-
-    if (_changedProperties.has('host')) {
-      this._onEdgelessCopilotAreaUpdated();
-    }
-  }
-
-  private async _updateState() {
-    if (
-      this.selectionValue.some(
-        selection => selection.is('text') || selection.is('image')
-      )
-    )
-      return;
-    this.text = await getSelectedTextContent(this.host, 'plain-text');
-    this.markdown = await getSelectedTextContent(this.host, 'markdown');
-    this.images = await getSelectedImagesAsBlobs(this.host);
-    const [_, data] = this.host.command
-      .chain()
-      .tryAll(chain => [
-        chain.getTextSelection(),
-        chain.getBlockSelections(),
-        chain.getImageSelections(),
-      ])
-      .getSelectedBlocks({
-        types: ['image'],
-      })
-      .run();
-    if (data.currentBlockSelections?.[0]) {
-      this.caption =
-        (
-          this.host.doc.getBlock(data.currentBlockSelections[0].blockId)
-            ?.model as ImageBlockModel
-        ).caption ?? '';
-    }
-  }
-
   private async _handleDocSelection() {
     const notes = this.host.doc
       .getBlocksByFlavour('affine:note')
@@ -320,6 +234,60 @@ export class ChatCards extends WithDisposable(LitElement) {
     this.images = images;
   }
 
+  private _onEdgelessCopilotAreaUpdated() {
+    if (!this.host.closest('edgeless-editor')) return;
+    const edgeless = getEdgelessRootFromEditor(this.host);
+
+    const copilotSelectionTool = edgeless.tools.controllers
+      .copilot as CopilotSelectionController;
+
+    this._disposables.add(
+      copilotSelectionTool.draggingAreaUpdated.on(
+        debounce(() => {
+          selectedToCanvas(this.host)
+            .then(canvas => {
+              canvas?.toBlob(blob => {
+                if (!blob) return;
+                const file = new File([blob], 'selected.png');
+                this.images = [file];
+              });
+            })
+            .catch(console.error);
+        }, 300)
+      )
+    );
+  }
+
+  private async _updateState() {
+    if (
+      this.selectionValue.some(
+        selection => selection.is('text') || selection.is('image')
+      )
+    )
+      return;
+    this.text = await getSelectedTextContent(this.host, 'plain-text');
+    this.markdown = await getSelectedTextContent(this.host, 'markdown');
+    this.images = await getSelectedImagesAsBlobs(this.host);
+    const [_, data] = this.host.command
+      .chain()
+      .tryAll(chain => [
+        chain.getTextSelection(),
+        chain.getBlockSelections(),
+        chain.getImageSelections(),
+      ])
+      .getSelectedBlocks({
+        types: ['image'],
+      })
+      .run();
+    if (data.currentBlockSelections?.[0]) {
+      this.caption =
+        (
+          this.host.doc.getBlock(data.currentBlockSelections[0].blockId)
+            ?.model as ImageBlockModel
+        ).caption ?? '';
+    }
+  }
+
   protected override render() {
     return html`<div class="cards-container">
       ${repeat(
@@ -350,6 +318,40 @@ export class ChatCards extends WithDisposable(LitElement) {
       )}
     </div>`;
   }
+
+  protected override async updated(_changedProperties: PropertyValues) {
+    if (_changedProperties.has('selectionValue')) {
+      await this._updateState();
+    }
+
+    if (_changedProperties.has('host')) {
+      this._onEdgelessCopilotAreaUpdated();
+    }
+  }
+
+  @state()
+  accessor caption: string = '';
+
+  @property({ attribute: false })
+  accessor chatContextValue!: ChatContextValue;
+
+  @property({ attribute: false })
+  accessor host!: EditorHost;
+
+  @state()
+  accessor images: File[] = [];
+
+  @state()
+  accessor markdown: string = '';
+
+  @property({ attribute: false })
+  accessor selectionValue: BaseSelection[] = [];
+
+  @state()
+  accessor text: string = '';
+
+  @property({ attribute: false })
+  accessor updateContext!: (context: Partial<ChatContextValue>) => void;
 }
 
 declare global {

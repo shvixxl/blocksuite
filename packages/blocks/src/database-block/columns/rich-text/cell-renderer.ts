@@ -11,12 +11,13 @@ import type {
   AffineInlineEditor,
   AffineTextAttributes,
 } from '../../../_common/inline/presets/affine-inline-specs.js';
+import type { DatabaseBlockComponent } from '../../database-block.js';
+
 import { getViewportElement } from '../../../_common/utils/query.js';
 import { HostContextKey } from '../../context/host-context.js';
 import { BaseCellRenderer } from '../../data-view/column/base-cell.js';
 import { createFromBaseCellRenderer } from '../../data-view/column/renderer.js';
 import { createIcon } from '../../data-view/utils/uni-icon.js';
-import type { DatabaseBlockComponent } from '../../database-block.js';
 import { richTextColumnModelConfig } from './define.js';
 
 function toggleStyle(
@@ -48,12 +49,7 @@ function toggleStyle(
     Object.entries(attrs).map(([k, v]) => {
       if (
         typeof v === 'boolean' &&
-        v ===
-          (
-            oldAttributes as {
-              [k: string]: unknown;
-            }
-          )[k]
+        v === (oldAttributes as Record<string, unknown>)[k]
       ) {
         return [k, !v];
       } else {
@@ -104,48 +100,15 @@ export class RichTextCell extends BaseCellRenderer<Text> {
     }
   `;
 
-  get service() {
-    return this.view
-      .getContext(HostContextKey)
-      ?.std.spec.getService('affine:database');
-  }
-
-  get inlineManager() {
-    return this.service?.inlineManager;
-  }
-  get attributesSchema() {
-    return this.inlineManager?.getSchema();
-  }
-  get attributeRenderer() {
-    return this.inlineManager?.getRenderer();
-  }
-
-  @query('rich-text')
-  private accessor _richTextElement: RichText | null = null;
-
-  get inlineEditor() {
-    assertExists(this._richTextElement);
-    const inlineEditor = this._richTextElement.inlineEditor;
-    assertExists(inlineEditor);
-    return inlineEditor;
-  }
-
-  get topContenteditableElement() {
-    const databaseBlock =
-      this.closest<DatabaseBlockComponent>('affine-database');
-    return databaseBlock?.topContenteditableElement;
-  }
-
   override render() {
     if (!this.service) return nothing;
-    if (!this.value) {
+    if (!this.value || !(this.value instanceof Text)) {
       return html`<div class="affine-database-rich-text"></div>`;
     }
     return keyed(
       this.value,
       html`<rich-text
         .yText=${this.value}
-        .inlineEventSource=${this.topContenteditableElement}
         .attributesSchema=${this.attributesSchema}
         .attributeRenderer=${this.attributeRenderer}
         .embedChecker=${this.inlineManager?.embedChecker}
@@ -155,58 +118,14 @@ export class RichTextCell extends BaseCellRenderer<Text> {
       ></rich-text>`
     );
   }
-}
 
-@customElement('affine-database-rich-text-cell-editing')
-export class RichTextCellEditing extends BaseCellRenderer<Text> {
-  static override styles = css`
-    affine-database-rich-text-cell-editing {
-      display: flex;
-      align-items: center;
-      width: 100%;
-      min-width: 1px;
-      cursor: text;
-    }
-
-    .affine-database-rich-text {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      width: 100%;
-      height: 100%;
-      outline: none;
-    }
-
-    .affine-database-rich-text v-line {
-      display: flex !important;
-      align-items: center;
-      height: 100%;
-      width: 100%;
-    }
-
-    .affine-database-rich-text v-line > div {
-      flex-grow: 1;
-    }
-  `;
-
-  get service() {
-    return this.view
-      .getContext(HostContextKey)
-      ?.std.spec.getService('affine:database');
-  }
-
-  get inlineManager() {
-    return this.service?.inlineManager;
-  }
-  get attributesSchema() {
-    return this.inlineManager?.getSchema();
-  }
   get attributeRenderer() {
     return this.inlineManager?.getRenderer();
   }
 
-  @query('rich-text')
-  private accessor _richTextElement: RichText | null = null;
+  get attributesSchema() {
+    return this.inlineManager?.getSchema();
+  }
 
   get inlineEditor() {
     assertExists(this._richTextElement);
@@ -215,47 +134,28 @@ export class RichTextCellEditing extends BaseCellRenderer<Text> {
     return inlineEditor;
   }
 
+  get inlineManager() {
+    return this.service?.inlineManager;
+  }
+
+  get service() {
+    return this.view
+      .getContext(HostContextKey)
+      ?.std.spec.getService('affine:database');
+  }
+
   get topContenteditableElement() {
     const databaseBlock =
       this.closest<DatabaseBlockComponent>('affine-database');
     return databaseBlock?.topContenteditableElement;
   }
 
-  override connectedCallback() {
-    super.connectedCallback();
+  @query('rich-text')
+  private accessor _richTextElement: RichText | null = null;
+}
 
-    if (!this.value || typeof this.value === 'string') {
-      this._initYText(this.value);
-    }
-
-    const selectAll = (e: KeyboardEvent) => {
-      if (e.key === 'a' && (IS_MAC ? e.metaKey : e.ctrlKey)) {
-        e.stopPropagation();
-        e.preventDefault();
-        this.inlineEditor.selectAll();
-      }
-    };
-    this.addEventListener('keydown', selectAll);
-    this.disposables.addFromEvent(this, 'keydown', selectAll);
-  }
-
-  override firstUpdated() {
-    this._richTextElement?.updateComplete
-      .then(() => {
-        this.disposables.add(
-          this.inlineEditor.slots.keydown.on(this._handleKeyDown)
-        );
-
-        this.inlineEditor.focusEnd();
-      })
-      .catch(console.error);
-  }
-
-  private _initYText = (text?: string) => {
-    const yText = new Text(text);
-    this.onChange(yText);
-  };
-
+@customElement('affine-database-rich-text-cell-editing')
+export class RichTextCellEditing extends BaseCellRenderer<Text> {
   private _handleKeyDown = (event: KeyboardEvent) => {
     if (event.key !== 'Escape') {
       if (event.key === 'Tab') {
@@ -325,6 +225,11 @@ export class RichTextCellEditing extends BaseCellRenderer<Text> {
     }
   };
 
+  private _initYText = (text?: string) => {
+    const yText = new Text(text);
+    this.onChange(yText);
+  };
+
   private _onSoftEnter = () => {
     if (this.value && this.inlineEditor) {
       const inlineRange = this.inlineEditor.getInlineRange();
@@ -339,9 +244,68 @@ export class RichTextCellEditing extends BaseCellRenderer<Text> {
     }
   };
 
+  static override styles = css`
+    affine-database-rich-text-cell-editing {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      min-width: 1px;
+      cursor: text;
+    }
+
+    .affine-database-rich-text {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      outline: none;
+    }
+
+    .affine-database-rich-text v-line {
+      display: flex !important;
+      align-items: center;
+      height: 100%;
+      width: 100%;
+    }
+
+    .affine-database-rich-text v-line > div {
+      flex-grow: 1;
+    }
+  `;
+
+  override connectedCallback() {
+    super.connectedCallback();
+
+    if (!this.value || typeof this.value === 'string') {
+      this._initYText(this.value);
+    }
+
+    const selectAll = (e: KeyboardEvent) => {
+      if (e.key === 'a' && (IS_MAC ? e.metaKey : e.ctrlKey)) {
+        e.stopPropagation();
+        e.preventDefault();
+        this.inlineEditor.selectAll();
+      }
+    };
+    this.addEventListener('keydown', selectAll);
+    this.disposables.addFromEvent(this, 'keydown', selectAll);
+  }
+
+  override firstUpdated() {
+    this._richTextElement?.updateComplete
+      .then(() => {
+        this.disposables.add(
+          this.inlineEditor.slots.keydown.on(this._handleKeyDown)
+        );
+
+        this.inlineEditor.focusEnd();
+      })
+      .catch(console.error);
+  }
+
   override render() {
     if (!this.service) return nothing;
-
     return html`<rich-text
       .yText=${this.value}
       .inlineEventSource=${this.topContenteditableElement}
@@ -356,6 +320,40 @@ export class RichTextCellEditing extends BaseCellRenderer<Text> {
       class="affine-database-rich-text inline-editor"
     ></rich-text>`;
   }
+
+  get attributeRenderer() {
+    return this.inlineManager?.getRenderer();
+  }
+
+  get attributesSchema() {
+    return this.inlineManager?.getSchema();
+  }
+
+  get inlineEditor() {
+    assertExists(this._richTextElement);
+    const inlineEditor = this._richTextElement.inlineEditor;
+    assertExists(inlineEditor);
+    return inlineEditor;
+  }
+
+  get inlineManager() {
+    return this.service?.inlineManager;
+  }
+
+  get service() {
+    return this.view
+      .getContext(HostContextKey)
+      ?.std.spec.getService('affine:database');
+  }
+
+  get topContenteditableElement() {
+    const databaseBlock =
+      this.closest<DatabaseBlockComponent>('affine-database');
+    return databaseBlock?.topContenteditableElement;
+  }
+
+  @query('rich-text')
+  private accessor _richTextElement: RichText | null = null;
 }
 
 declare global {

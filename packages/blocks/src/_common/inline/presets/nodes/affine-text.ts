@@ -23,11 +23,11 @@ export function affineTextStyles(
     inlineCodeStyle = {
       'font-family': 'var(--affine-font-code-family)',
       background: 'var(--affine-background-code-block)',
+      border: '1px solid var(--affine-border-color)',
+      'border-radius': '4px',
       color: 'var(--affine-text-primary-color)',
-      'border-radius': '2px',
-      padding: '3px 6px 4px',
       'font-variant-ligatures': 'none',
-      'line-height': 'var(--affine-font-base)',
+      'line-height': 'auto',
     };
   }
 
@@ -44,11 +44,6 @@ export function affineTextStyles(
 
 @customElement('affine-text')
 export class AffineText extends ShadowlessElement {
-  @property({ type: Object })
-  accessor delta: DeltaInsert<AffineTextAttributes> = {
-    insert: ZERO_WIDTH_SPACE,
-  };
-
   override render() {
     const style = this.delta.attributes
       ? affineTextStyles(this.delta.attributes)
@@ -68,6 +63,11 @@ export class AffineText extends ShadowlessElement {
       ><v-text .str=${this.delta.insert}></v-text
     ></span>`;
   }
+
+  @property({ type: Object })
+  accessor delta: DeltaInsert<AffineTextAttributes> = {
+    insert: ZERO_WIDTH_SPACE,
+  };
 }
 
 declare global {

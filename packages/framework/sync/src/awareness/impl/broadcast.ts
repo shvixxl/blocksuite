@@ -1,4 +1,5 @@
 import type { Awareness } from 'y-protocols/awareness';
+
 import {
   applyAwarenessUpdate,
   encodeAwarenessUpdate,
@@ -13,8 +14,25 @@ type ChannelMessage =
   | { type: 'update'; update: Uint8Array };
 
 export class BroadcastChannelAwarenessSource implements AwarenessSource {
-  channel: BroadcastChannel | null = null;
   awareness: Awareness | null = null;
+
+  channel: BroadcastChannel | null = null;
+
+  handleAwarenessUpdate = (changes: AwarenessChanges, origin: unknown) => {
+    if (origin === 'remote') {
+      return;
+    }
+
+    const changedClients = Object.values(changes).reduce((res, cur) =>
+      res.concat(cur)
+    );
+
+    const update = encodeAwarenessUpdate(this.awareness!, changedClients);
+    this.channel?.postMessage({
+      type: 'update',
+      update: update,
+    } satisfies ChannelMessage);
+  };
 
   constructor(readonly channelName: string) {}
 
@@ -32,27 +50,12 @@ export class BroadcastChannelAwarenessSource implements AwarenessSource {
       }
     );
   }
+
   disconnect(): void {
     this.awareness?.off('update', this.handleAwarenessUpdate);
     this.channel?.close();
     this.channel = null;
   }
-
-  handleAwarenessUpdate = (changes: AwarenessChanges, origin: unknown) => {
-    if (origin === 'remote') {
-      return;
-    }
-
-    const changedClients = Object.values(changes).reduce((res, cur) =>
-      res.concat(cur)
-    );
-
-    const update = encodeAwarenessUpdate(this.awareness!, changedClients);
-    this.channel?.postMessage({
-      type: 'update',
-      update: update,
-    } satisfies ChannelMessage);
-  };
 
   handleChannelMessage(event: MessageEvent<ChannelMessage>) {
     if (event.data.type === 'update') {

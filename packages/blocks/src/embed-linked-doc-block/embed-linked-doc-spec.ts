@@ -1,32 +1,22 @@
-import { literal, unsafeStatic } from 'lit/static-html.js';
+import type { BlockSpec } from '@blocksuite/block-std';
 
-import { createEmbedBlock } from '../_common/embed-block-helper/helper.js';
-import { EMBED_CARD_TOOLBAR } from '../root-block/widgets/embed-card-toolbar/embed-card-toolbar.js';
-import {
-  type EmbedLinkedDocBlockProps,
-  EmbedLinkedDocModel,
-  EmbedLinkedDocStyles,
-} from './embed-linked-doc-model.js';
+import { literal } from 'lit/static-html.js';
+
+import type { EmbedLinkedDocBlockConfig } from './embed-linked-doc-block.js';
+
+import { EmbedLinkedDocBlockSchema } from './embed-linked-doc-schema.js';
 import { EmbedLinkedDocBlockService } from './embed-linked-doc-service.js';
 
-const defaultEmbedLinkedDocBlockProps: EmbedLinkedDocBlockProps = {
-  pageId: '',
-  style: EmbedLinkedDocStyles[1],
-  caption: null,
-};
+export type EmbedLinkedDocBlockSpecType = BlockSpec<
+  string,
+  EmbedLinkedDocBlockService,
+  EmbedLinkedDocBlockConfig
+>;
 
-export const EmbedLinkedDocBlockSpec = createEmbedBlock({
-  schema: {
-    name: 'linked-doc',
-    version: 1,
-    toModel: () => new EmbedLinkedDocModel(),
-    props: (): EmbedLinkedDocBlockProps => defaultEmbedLinkedDocBlockProps,
-  },
+export const EmbedLinkedDocBlockSpec: EmbedLinkedDocBlockSpecType = {
+  schema: EmbedLinkedDocBlockSchema,
   view: {
     component: literal`affine-embed-linked-doc-block`,
-    widgets: {
-      [EMBED_CARD_TOOLBAR]: literal`${unsafeStatic(EMBED_CARD_TOOLBAR)}`,
-    },
   },
   service: EmbedLinkedDocBlockService,
-});
+};

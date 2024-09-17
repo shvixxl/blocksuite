@@ -1,9 +1,10 @@
 import { WithDisposable } from '@blocksuite/block-std';
-import { css, html, LitElement } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 
-import type { DataViewTableManager } from '../table-view-manager.js';
+import type { GroupData } from '../../../../common/group-by/helper.js';
+import type { TableSingleView } from '../table-view-manager.js';
 
 const styles = css`
   .affine-database-column-stats {
@@ -16,21 +17,9 @@ const styles = css`
 @customElement('affine-database-column-stats')
 export class DataBaseColumnStats extends WithDisposable(LitElement) {
   static override styles = styles;
-  @property({ attribute: false })
-  accessor view!: DataViewTableManager;
-
-  override connectedCallback(): void {
-    super.connectedCallback();
-
-    this.disposables.add(
-      this.view.slots.update.on(() => {
-        this.requestUpdate();
-      })
-    );
-  }
 
   protected override render() {
-    const cols = this.view.columnManagerList;
+    const cols = this.view.columnManagerList$.value;
 
     return html`
       <div class="affine-database-column-stats">
@@ -39,13 +28,20 @@ export class DataBaseColumnStats extends WithDisposable(LitElement) {
           col => col.id,
           col => {
             return html`<affine-database-column-stats-cell
-              .column="${col}"
+              .column=${col}
+              .group=${this.group}
             ></affine-database-column-stats-cell>`;
           }
         )}
       </div>
     `;
   }
+
+  @property({ attribute: false })
+  accessor group: GroupData | undefined = undefined;
+
+  @property({ attribute: false })
+  accessor view!: TableSingleView;
 }
 
 declare global {

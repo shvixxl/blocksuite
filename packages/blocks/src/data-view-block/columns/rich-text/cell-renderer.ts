@@ -1,6 +1,7 @@
+import type { Y } from '@blocksuite/store';
+
 import { IS_MAC } from '@blocksuite/global/env';
 import { assertExists } from '@blocksuite/global/utils';
-import type { Y } from '@blocksuite/store';
 import { DocCollection, Text } from '@blocksuite/store';
 import { css, nothing } from 'lit';
 import { customElement, query } from 'lit/decorators.js';
@@ -11,11 +12,12 @@ import type {
   AffineInlineEditor,
   AffineTextAttributes,
 } from '../../../_common/inline/presets/affine-inline-specs.js';
+import type { DatabaseBlockComponent } from '../../../database-block/index.js';
+
 import { getViewportElement } from '../../../_common/utils/query.js';
 import { BaseCellRenderer } from '../../../database-block/data-view/column/index.js';
 import { createFromBaseCellRenderer } from '../../../database-block/data-view/column/renderer.js';
 import { createIcon } from '../../../database-block/data-view/utils/uni-icon.js';
-import type { DatabaseBlockComponent } from '../../../database-block/index.js';
 import { richTextColumnModelConfig } from './define.js';
 
 function toggleStyle(
@@ -47,12 +49,7 @@ function toggleStyle(
     Object.entries(attrs).map(([k, v]) => {
       if (
         typeof v === 'boolean' &&
-        v ===
-          (
-            oldAttributes as {
-              [k: string]: unknown;
-            }
-          )[k]
+        v === (oldAttributes as Record<string, unknown>)[k]
       ) {
         return [k, !v];
       } else {
@@ -71,6 +68,11 @@ function toggleStyle(
 
 @customElement('affine-data-view-rich-text-cell')
 export class RichTextCell extends BaseCellRenderer<Y.Text> {
+  private _initYText = (text?: string) => {
+    const yText = new DocCollection.Y.Text(text);
+    this.onChange(yText);
+  };
+
   static override styles = css`
     affine-data-view-rich-text-cell {
       display: flex;
@@ -103,37 +105,6 @@ export class RichTextCell extends BaseCellRenderer<Y.Text> {
     }
   `;
 
-  get service() {
-    const database = this.closest<DatabaseBlockComponent>('affine-data-view');
-    return database?.service;
-  }
-
-  get inlineManager() {
-    return this.service?.inlineManager;
-  }
-  get attributesSchema() {
-    return this.inlineManager?.getSchema();
-  }
-  get attributeRenderer() {
-    return this.inlineManager?.getRenderer();
-  }
-
-  @query('rich-text')
-  private accessor _richTextElement: RichText | null = null;
-
-  get inlineEditor() {
-    assertExists(this._richTextElement);
-    const inlineEditor = this._richTextElement.inlineEditor;
-    assertExists(inlineEditor);
-    return inlineEditor;
-  }
-
-  get topContenteditableElement() {
-    const databaseBlock =
-      this.closest<DatabaseBlockComponent>('affine-data-view');
-    return databaseBlock?.topContenteditableElement;
-  }
-
   override connectedCallback() {
     super.connectedCallback();
 
@@ -141,11 +112,6 @@ export class RichTextCell extends BaseCellRenderer<Y.Text> {
       this._initYText(this.value);
     }
   }
-
-  private _initYText = (text?: string) => {
-    const yText = new DocCollection.Y.Text(text);
-    this.onChange(yText);
-  };
 
   override render() {
     if (!this.service) return nothing;
@@ -163,57 +129,14 @@ export class RichTextCell extends BaseCellRenderer<Y.Text> {
       class="affine-data-view-rich-text inline-editor"
     ></rich-text>`;
   }
-}
 
-@customElement('affine-data-view-rich-text-cell-editing')
-export class RichTextCellEditing extends BaseCellRenderer<Text> {
-  static override styles = css`
-    affine-data-view-rich-text-cell-editing {
-      display: flex;
-      align-items: center;
-      width: 100%;
-      min-width: 1px;
-      cursor: text;
-    }
-
-    .affine-data-view-rich-text {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      width: 100%;
-      height: 100%;
-      outline: none;
-    }
-
-    .affine-data-view-rich-text v-line {
-      display: flex !important;
-      align-items: center;
-      height: 100%;
-      width: 100%;
-    }
-
-    .affine-data-view-rich-text v-line > div {
-      flex-grow: 1;
-    }
-  `;
-
-  get service() {
-    const database = this.closest<DatabaseBlockComponent>('affine-data-view');
-    return database?.service;
-  }
-
-  get inlineManager() {
-    return this.service?.inlineManager;
-  }
-  get attributesSchema() {
-    return this.inlineManager?.getSchema();
-  }
   get attributeRenderer() {
     return this.inlineManager?.getRenderer();
   }
 
-  @query('rich-text')
-  private accessor _richTextElement: RichText | null = null;
+  get attributesSchema() {
+    return this.inlineManager?.getSchema();
+  }
 
   get inlineEditor() {
     assertExists(this._richTextElement);
@@ -222,46 +145,27 @@ export class RichTextCellEditing extends BaseCellRenderer<Text> {
     return inlineEditor;
   }
 
+  get inlineManager() {
+    return this.service?.inlineManager;
+  }
+
+  get service() {
+    const database = this.closest<DatabaseBlockComponent>('affine-data-view');
+    return database?.service;
+  }
+
   get topContenteditableElement() {
     const databaseBlock =
       this.closest<DatabaseBlockComponent>('affine-data-view');
     return databaseBlock?.topContenteditableElement;
   }
 
-  override connectedCallback() {
-    super.connectedCallback();
+  @query('rich-text')
+  private accessor _richTextElement: RichText | null = null;
+}
 
-    if (!this.value || typeof this.value === 'string') {
-      this._initYText(this.value);
-    }
-
-    const selectAll = (e: KeyboardEvent) => {
-      if (e.key === 'a' && (IS_MAC ? e.metaKey : e.ctrlKey)) {
-        e.stopPropagation();
-        e.preventDefault();
-        this.inlineEditor.selectAll();
-      }
-    };
-    this.disposables.addFromEvent(this, 'keydown', selectAll);
-  }
-
-  override firstUpdated() {
-    this._richTextElement?.updateComplete
-      .then(() => {
-        this.disposables.add(
-          this.inlineEditor.slots.keydown.on(this._handleKeyDown)
-        );
-
-        this.inlineEditor.focusEnd();
-      })
-      .catch(console.error);
-  }
-
-  private _initYText = (text?: string) => {
-    const yText = new Text(text);
-    this.onChange(yText);
-  };
-
+@customElement('affine-data-view-rich-text-cell-editing')
+export class RichTextCellEditing extends BaseCellRenderer<Text> {
   private _handleKeyDown = (event: KeyboardEvent) => {
     if (event.key !== 'Escape') {
       if (event.key === 'Tab') {
@@ -331,6 +235,11 @@ export class RichTextCellEditing extends BaseCellRenderer<Text> {
     }
   };
 
+  private _initYText = (text?: string) => {
+    const yText = new Text(text);
+    this.onChange(yText);
+  };
+
   private _onSoftEnter = () => {
     if (this.value && this.inlineEditor) {
       const inlineRange = this.inlineEditor.getInlineRange();
@@ -344,6 +253,65 @@ export class RichTextCellEditing extends BaseCellRenderer<Text> {
       });
     }
   };
+
+  static override styles = css`
+    affine-data-view-rich-text-cell-editing {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      min-width: 1px;
+      cursor: text;
+    }
+
+    .affine-data-view-rich-text {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      outline: none;
+    }
+
+    .affine-data-view-rich-text v-line {
+      display: flex !important;
+      align-items: center;
+      height: 100%;
+      width: 100%;
+    }
+
+    .affine-data-view-rich-text v-line > div {
+      flex-grow: 1;
+    }
+  `;
+
+  override connectedCallback() {
+    super.connectedCallback();
+
+    if (!this.value || typeof this.value === 'string') {
+      this._initYText(this.value);
+    }
+
+    const selectAll = (e: KeyboardEvent) => {
+      if (e.key === 'a' && (IS_MAC ? e.metaKey : e.ctrlKey)) {
+        e.stopPropagation();
+        e.preventDefault();
+        this.inlineEditor.selectAll();
+      }
+    };
+    this.disposables.addFromEvent(this, 'keydown', selectAll);
+  }
+
+  override firstUpdated() {
+    this._richTextElement?.updateComplete
+      .then(() => {
+        this.disposables.add(
+          this.inlineEditor.slots.keydown.on(this._handleKeyDown)
+        );
+
+        this.inlineEditor.focusEnd();
+      })
+      .catch(console.error);
+  }
 
   override render() {
     if (!this.service) return nothing;
@@ -362,6 +330,39 @@ export class RichTextCellEditing extends BaseCellRenderer<Text> {
       class="affine-data-view-rich-text inline-editor"
     ></rich-text>`;
   }
+
+  get attributeRenderer() {
+    return this.inlineManager?.getRenderer();
+  }
+
+  get attributesSchema() {
+    return this.inlineManager?.getSchema();
+  }
+
+  get inlineEditor() {
+    assertExists(this._richTextElement);
+    const inlineEditor = this._richTextElement.inlineEditor;
+    assertExists(inlineEditor);
+    return inlineEditor;
+  }
+
+  get inlineManager() {
+    return this.service?.inlineManager;
+  }
+
+  get service() {
+    const database = this.closest<DatabaseBlockComponent>('affine-data-view');
+    return database?.service;
+  }
+
+  get topContenteditableElement() {
+    const databaseBlock =
+      this.closest<DatabaseBlockComponent>('affine-data-view');
+    return databaseBlock?.topContenteditableElement;
+  }
+
+  @query('rich-text')
+  private accessor _richTextElement: RichText | null = null;
 }
 
 declare global {

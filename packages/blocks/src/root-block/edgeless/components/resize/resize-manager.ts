@@ -1,8 +1,12 @@
-import { assertExists } from '@blocksuite/global/utils';
+import type { PointLocation } from '@blocksuite/global/utils';
+import type { IVec } from '@blocksuite/global/utils';
 
-import type { IPoint } from '../../../../_common/types.js';
+import { Bound } from '@blocksuite/global/utils';
+import { type IPoint, assertExists } from '@blocksuite/global/utils';
+
+import type { SelectableProps } from '../../utils/query.js';
+
 import {
-  Bound,
   getQuadBoundsWithRotation,
   rotatePoints,
 } from '../../../../surface-block/index.js';
@@ -20,6 +24,8 @@ type ResizeMoveHandler = (
     string,
     {
       bound: Bound;
+      path?: PointLocation[];
+      matrix?: DOMMatrix;
     }
   >,
   direction: HandleDirection
@@ -28,34 +34,7 @@ type ResizeMoveHandler = (
 type RotateMoveHandler = (point: IPoint, rotate: number) => void;
 
 export class HandleResizeManager {
-  private _onDragStart: DragStartHandler;
-  private _onResizeMove: ResizeMoveHandler;
-  private _onRotateMove: RotateMoveHandler;
-  private _onDragEnd: DragEndHandler;
-  private _dragDirection: HandleDirection = HandleDirection.Left;
-  private _dragPos: {
-    start: { x: number; y: number };
-    end: { x: number; y: number };
-  } = {
-    start: { x: 0, y: 0 },
-    end: { x: 0, y: 0 },
-  };
-
-  private _rotate = 0;
-
-  /**
-   * Record inital rect of selected elements
-   */
-  private _originalRect = new DOMRect();
-
-  /**
-   * Current rect of selected elements, it may change during resizing or moving
-   */
-  private _currentRect = new DOMRect();
-
-  private _origin: { x: number; y: number } = { x: 0, y: 0 };
-  private _resizeMode: ResizeMode = 'none';
-  private _zoom = 1;
+  private _aspectRatio = 1;
 
   private _bounds = new Map<
     string,
@@ -65,15 +44,125 @@ export class HandleResizeManager {
     }
   >();
 
-  private _aspectRatio = 1;
-  private _locked = false;
-  private _proportion = false;
-  private _shiftKey = false;
-  private _proportional = false;
-  private _rotation = false;
-  private _target: HTMLElement | null = null;
+  /**
+   * Current rect of selected elements, it may change during resizing or moving
+   */
+  private _currentRect = new DOMRect();
+
+  private _dragDirection: HandleDirection = HandleDirection.Left;
+
+  private _dragPos: {
+    start: { x: number; y: number };
+    end: { x: number; y: number };
+  } = {
+    start: { x: 0, y: 0 },
+    end: { x: 0, y: 0 },
+  };
 
   private _dragging = false;
+
+  private _locked = false;
+
+  private _onDragEnd: DragEndHandler;
+
+  private _onDragStart: DragStartHandler;
+
+  private _onResizeMove: ResizeMoveHandler;
+
+  private _onRotateMove: RotateMoveHandler;
+
+  private _origin: { x: number; y: number } = { x: 0, y: 0 };
+
+  /**
+   * Record inital rect of selected elements
+   */
+  private _originalRect = new DOMRect();
+
+  private _proportion = false;
+
+  private _proportional = false;
+
+  private _resizeMode: ResizeMode = 'none';
+
+  private _rotate = 0;
+
+  private _rotation = false;
+
+  private _shiftKey = false;
+
+  private _target: HTMLElement | null = null;
+
+  private _zoom = 1;
+
+  onPointerDown = (
+    e: PointerEvent,
+    direction: HandleDirection,
+    proportional = false
+  ) => {
+    // Prevent selection action from being triggered
+    e.stopPropagation();
+
+    this._locked = false;
+    this._target = e.target as HTMLElement;
+    this._dragDirection = direction;
+    this._dragPos.start = { x: e.x, y: e.y };
+    this._dragPos.end = { x: e.x, y: e.y };
+    this._rotation = this._target.classList.contains('rotate');
+    this._proportional = proportional;
+
+    if (this._rotation) {
+      const rect = this._target
+        .closest('.affine-edgeless-selected-rect')
+        ?.getBoundingClientRect();
+      assertExists(rect);
+      const { left, top, right, bottom } = rect;
+      const x = (left + right) / 2;
+      const y = (top + bottom) / 2;
+      // center of `selected-rect` in viewport
+      this._origin = { x, y };
+    }
+
+    this._dragging = true;
+    this._onDragStart();
+
+    const _onPointerMove = ({ x, y, shiftKey }: PointerEvent) => {
+      if (this._resizeMode === 'none') return;
+
+      this._shiftKey = shiftKey;
+      this._dragPos.end = { x, y };
+
+      const proportional = this._proportional || this._shiftKey;
+
+      if (this._rotation) {
+        this._onRotate(proportional);
+        return;
+      }
+
+      this._onResize(proportional);
+    };
+
+    const _onPointerUp = (_: PointerEvent) => {
+      this._dragging = false;
+      this._onDragEnd();
+
+      const { x, y, width, height } = this._currentRect;
+      this._originalRect = new DOMRect(x, y, width, height);
+
+      this._locked = true;
+      this._shiftKey = false;
+      this._rotation = false;
+      this._dragPos = {
+        start: { x: 0, y: 0 },
+        end: { x: 0, y: 0 },
+      };
+
+      document.removeEventListener('pointermove', _onPointerMove);
+      document.removeEventListener('pointerup', _onPointerUp);
+    };
+
+    document.addEventListener('pointermove', _onPointerMove);
+    document.addEventListener('pointerup', _onPointerUp);
+  };
 
   constructor(
     onDragStart: DragStartHandler,
@@ -85,74 +174,6 @@ export class HandleResizeManager {
     this._onResizeMove = onResizeMove;
     this._onRotateMove = onRotateMove;
     this._onDragEnd = onDragEnd;
-  }
-
-  get dragging() {
-    return this._dragging;
-  }
-
-  get rotation() {
-    return this._rotation;
-  }
-
-  get currentRect() {
-    return this._currentRect;
-  }
-
-  get originalRect() {
-    return this._originalRect;
-  }
-
-  get bounds() {
-    return this._bounds;
-  }
-
-  updateState(
-    resizeMode: ResizeMode,
-    rotate: number,
-    zoom: number,
-    position?: { x: number; y: number },
-    originalRect?: DOMRect,
-    proportion = false
-  ) {
-    this._resizeMode = resizeMode;
-    this._rotate = rotate;
-    this._zoom = zoom;
-    this._proportion = proportion;
-
-    if (position) {
-      this._currentRect.x = position.x;
-      this._currentRect.y = position.y;
-      this._originalRect.x = this._currentRect.x;
-      this._originalRect.y = this._currentRect.y;
-    }
-
-    if (originalRect) {
-      this._originalRect = originalRect;
-      this._aspectRatio = originalRect.width / originalRect.height;
-      this._currentRect = DOMRect.fromRect(originalRect);
-    }
-  }
-
-  updateRectPosition(delta: { x: number; y: number }) {
-    this._currentRect.x += delta.x;
-    this._currentRect.y += delta.y;
-    this._originalRect.x = this._currentRect.x;
-    this._originalRect.y = this._currentRect.y;
-
-    return this._originalRect;
-  }
-
-  updateBounds(
-    bounds: Map<
-      string,
-      {
-        bound: Bound;
-        rotate: number;
-      }
-    >
-  ) {
-    this._bounds = bounds;
   }
 
   private _onResize(proportion: boolean) {
@@ -295,7 +316,7 @@ export class HandleResizeManager {
         _dragDirection === HandleDirection.Bottom
       ) {
         const dpo = draggingPoint.matrixTransform(m0);
-        const coorPoint = [0, 0];
+        const coorPoint: IVec = [0, 0];
         const [[x1, y1]] = rotatePoints([[dpo.x, dpo.y]], coorPoint, -_rotate);
         const [[x2, y2]] = rotatePoints([[dp.x, dp.y]], coorPoint, -_rotate);
         const point = { x: 0, y: 0 };
@@ -446,10 +467,12 @@ export class HandleResizeManager {
       string,
       {
         bound: Bound;
+        path?: PointLocation[];
+        matrix?: DOMMatrix;
       }
     >();
 
-    let process: (value: { bound: Bound; rotate: number }, key: string) => void;
+    let process: (value: SelectableProps, key: string) => void;
 
     if (isCorner || isAll || isEdgeAndCorner) {
       if (this._bounds.size === 1) {
@@ -470,7 +493,7 @@ export class HandleResizeManager {
           .translateSelf(-fp.x, -fp.y);
 
         // TODO: on same rotate
-        process = ({ bound: { x, y, w, h } }, id) => {
+        process = ({ bound: { x, y, w, h }, path }, id) => {
           const cx = x + w / 2;
           const cy = y + h / 2;
           const center = new DOMPoint(cx, cy).matrixTransform(m2);
@@ -484,6 +507,8 @@ export class HandleResizeManager {
               newWidth,
               newHeight
             ),
+            matrix: m2,
+            path,
           });
         };
       }
@@ -497,7 +522,7 @@ export class HandleResizeManager {
         fixedPoint.y,
         0
       );
-      process = ({ bound: { x, y, w, h }, rotate = 0 }, id) => {
+      process = ({ bound: { x, y, w, h }, rotate = 0, path }, id) => {
         const cx = x + w / 2;
         const cy = y + h / 2;
 
@@ -539,6 +564,8 @@ export class HandleResizeManager {
             newWidth,
             newHeight
           ),
+          matrix: m2,
+          path,
         });
       };
     }
@@ -597,76 +624,6 @@ export class HandleResizeManager {
     this._rotate += delta;
   }
 
-  onPointerDown = (
-    e: PointerEvent,
-    direction: HandleDirection,
-    proportional = false
-  ) => {
-    // Prevent selection action from being triggered
-    e.stopPropagation();
-
-    this._locked = false;
-    this._target = e.target as HTMLElement;
-    this._dragDirection = direction;
-    this._dragPos.start = { x: e.x, y: e.y };
-    this._dragPos.end = { x: e.x, y: e.y };
-    this._rotation = this._target.classList.contains('rotate');
-    this._proportional = proportional;
-
-    if (this._rotation) {
-      const rect = this._target
-        .closest('.affine-edgeless-selected-rect')
-        ?.getBoundingClientRect();
-      assertExists(rect);
-      const { left, top, right, bottom } = rect;
-      const x = (left + right) / 2;
-      const y = (top + bottom) / 2;
-      // center of `selected-rect` in viewport
-      this._origin = { x, y };
-    }
-
-    this._dragging = true;
-    this._onDragStart();
-
-    const _onPointerMove = ({ x, y, shiftKey }: PointerEvent) => {
-      if (this._resizeMode === 'none') return;
-
-      this._shiftKey = shiftKey;
-      this._dragPos.end = { x, y };
-
-      const proportional = this._proportional || this._shiftKey;
-
-      if (this._rotation) {
-        this._onRotate(proportional);
-        return;
-      }
-
-      this._onResize(proportional);
-    };
-
-    const _onPointerUp = (_: PointerEvent) => {
-      this._dragging = false;
-      this._onDragEnd();
-
-      const { x, y, width, height } = this._currentRect;
-      this._originalRect = new DOMRect(x, y, width, height);
-
-      this._locked = true;
-      this._shiftKey = false;
-      this._rotation = false;
-      this._dragPos = {
-        start: { x: 0, y: 0 },
-        end: { x: 0, y: 0 },
-      };
-
-      document.removeEventListener('pointermove', _onPointerMove);
-      document.removeEventListener('pointerup', _onPointerUp);
-    };
-
-    document.addEventListener('pointermove', _onPointerMove);
-    document.addEventListener('pointerup', _onPointerUp);
-  };
-
   onPressShiftKey(pressed: boolean) {
     if (!this._target) return;
     if (this._locked) return;
@@ -682,5 +639,69 @@ export class HandleResizeManager {
     }
 
     this._onResize(proportional);
+  }
+
+  updateBounds(bounds: Map<string, SelectableProps>) {
+    this._bounds = bounds;
+  }
+
+  updateRectPosition(delta: { x: number; y: number }) {
+    this._currentRect.x += delta.x;
+    this._currentRect.y += delta.y;
+    this._originalRect.x = this._currentRect.x;
+    this._originalRect.y = this._currentRect.y;
+
+    return this._originalRect;
+  }
+
+  updateState(
+    resizeMode: ResizeMode,
+    rotate: number,
+    zoom: number,
+    position?: { x: number; y: number },
+    originalRect?: DOMRect,
+    proportion = false
+  ) {
+    this._resizeMode = resizeMode;
+    this._rotate = rotate;
+    this._zoom = zoom;
+    this._proportion = proportion;
+
+    if (position) {
+      this._currentRect.x = position.x;
+      this._currentRect.y = position.y;
+      this._originalRect.x = this._currentRect.x;
+      this._originalRect.y = this._currentRect.y;
+    }
+
+    if (originalRect) {
+      this._originalRect = originalRect;
+      this._aspectRatio = originalRect.width / originalRect.height;
+      this._currentRect = DOMRect.fromRect(originalRect);
+    }
+  }
+
+  get bounds() {
+    return this._bounds;
+  }
+
+  get currentRect() {
+    return this._currentRect;
+  }
+
+  get dragDirection() {
+    return this._dragDirection;
+  }
+
+  get dragging() {
+    return this._dragging;
+  }
+
+  get originalRect() {
+    return this._originalRect;
+  }
+
+  get rotation() {
+    return this._rotation;
   }
 }

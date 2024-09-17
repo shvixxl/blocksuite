@@ -1,39 +1,40 @@
-import './template-loading.js';
-import './overlay-scrollbar.js';
+import type { IBound } from '@blocksuite/global/utils';
 
 import { WithDisposable } from '@blocksuite/block-std';
+import { Bound } from '@blocksuite/global/utils';
 import { baseTheme } from '@toeverything/theme';
-import { css, html, LitElement, nothing, unsafeCSS } from 'lit';
+import { LitElement, css, html, nothing, unsafeCSS } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { styleMap } from 'lit/directives/style-map.js';
 import { unsafeSVG } from 'lit/directives/unsafe-svg.js';
 
+import type { EdgelessRootBlockComponent } from '../../../edgeless-root-block.js';
+import type { TemplateJob } from '../../../services/template.js';
+import type { Template } from './template-type.js';
+
 import {
   requestConnectedFrame,
   stopPropagation,
 } from '../../../../../_common/utils/event.js';
-import { type IBound } from '../../../../../surface-block/consts.js';
-import {
-  Bound,
-  getCommonBound,
-} from '../../../../../surface-block/utils/bound.js';
-import type { EdgelessRootBlockComponent } from '../../../edgeless-root-block.js';
-import type { TemplateJob } from '../../../services/template.js';
+import { getCommonBound } from '../../../../../surface-block/utils/bound.js';
 import {
   createInsertPlaceMiddleware,
   createRegenerateIndexMiddleware,
   createStickerMiddleware,
   replaceIdMiddleware,
 } from '../../../services/template-middlewares.js';
+import { EdgelessDraggableElementController } from '../common/draggable/draggable-element.controller.js';
 import { builtInTemplates } from './builtin-templates.js';
 import { ArrowIcon, defaultPreview } from './icon.js';
-import type { Template } from './template-type.js';
+import './overlay-scrollbar.js';
+import './template-loading.js';
 import { cloneDeep } from './utils.js';
 
 @customElement('edgeless-templates-panel')
 export class EdgelessTemplatePanel extends WithDisposable(LitElement) {
-  static templates = builtInTemplates;
+  private _fetchJob: null | { cancel: () => void } = null;
+
   static override styles = css`
     :host {
       position: absolute;
@@ -140,7 +141,7 @@ export class EdgelessTemplatePanel extends WithDisposable(LitElement) {
       color: var(--affine-background-primary-color);
     }
 
-    .template-item:hover::before {
+    /* .template-item:hover::before {
       content: attr(data-hover-text);
       position: absolute;
       display: block;
@@ -157,7 +158,7 @@ export class EdgelessTemplatePanel extends WithDisposable(LitElement) {
 
       background-color: var(--affine-primary-color);
       color: var(--affine-white);
-    }
+    } */
 
     .template-item:hover::after {
       content: '';
@@ -198,68 +199,54 @@ export class EdgelessTemplatePanel extends WithDisposable(LitElement) {
     }
   `;
 
-  @state()
-  private accessor _currentCategory = '';
+  static templates = builtInTemplates;
 
-  @state()
-  private accessor _loadingTemplate: Template | null = null;
+  draggableController!: EdgelessDraggableElementController<Template>;
 
-  @state()
-  private accessor _searchKeyword = '';
+  private _closePanel() {
+    if (this.isDragging) return;
+    this.dispatchEvent(new CustomEvent('closepanel'));
+  }
 
-  @state()
-  private accessor _loading = false;
+  private _createTemplateJob(type: string, center: { x: number; y: number }) {
+    const middlewares: ((job: TemplateJob) => void)[] = [];
+    const service = this.edgeless.service;
 
-  @state()
-  private accessor _categories: string[] = [];
+    if (type === 'template') {
+      const currentContentBound = getCommonBound(
+        (
+          service.blocks.map(block => Bound.deserialize(block.xywh)) as IBound[]
+        ).concat(service.elements)
+      );
 
-  @state()
-  private accessor _templates: Template[] = [];
-
-  private _fetchJob: null | { cancel: () => void } = null;
-
-  @property({ attribute: false })
-  accessor edgeless!: EdgelessRootBlockComponent;
-
-  override connectedCallback(): void {
-    super.connectedCallback();
-
-    this.addEventListener('keydown', stopPropagation, false);
-    this._disposables.add(() => {
-      if (this._currentCategory) {
-        this.edgeless.service.editPropsStore.setItem(
-          'templateCache',
-          this._currentCategory
-        );
+      if (currentContentBound) {
+        currentContentBound.x +=
+          currentContentBound.w + 20 / service.viewport.zoom;
+        middlewares.push(createInsertPlaceMiddleware(currentContentBound));
       }
-    });
-  }
 
-  override firstUpdated() {
-    requestConnectedFrame(() => {
-      this._disposables.addFromEvent(document, 'click', evt => {
-        if (this.contains(evt.target as HTMLElement)) {
-          return;
-        }
+      const idxGenerator = service.layer.createIndexGenerator(true);
 
-        this._closePanel();
-      });
-    }, this);
-    this._disposables.addFromEvent(this, 'click', stopPropagation);
-    this._disposables.addFromEvent(this, 'wheel', stopPropagation);
-
-    this._initCategory().catch(() => {});
-  }
-
-  private async _initCategory() {
-    try {
-      this._categories = await EdgelessTemplatePanel.templates.categories();
-      this._currentCategory =
-        this._getLocalSelectedCategory() ?? this._categories[0];
-      this._updateTemplates();
-    } catch (e) {
-      console.error('Failed to load categories', e);
+      middlewares.push(
+        createRegenerateIndexMiddleware((type: string) => idxGenerator(type))
+      );
     }
+
+    if (type === 'sticker') {
+      middlewares.push(
+        createStickerMiddleware(center, () =>
+          service.layer.generateIndex('affine:image')
+        )
+      );
+    }
+
+    middlewares.push(replaceIdMiddleware);
+
+    return this.edgeless.service.TemplateJob.create({
+      model: this.edgeless.surfaceBlockModel,
+      type,
+      middlewares,
+    });
   }
 
   private _fetch(fn: (state: { canceled: boolean }) => Promise<unknown>) {
@@ -288,75 +275,55 @@ export class EdgelessTemplatePanel extends WithDisposable(LitElement) {
       });
   }
 
-  private _updateTemplates() {
-    this._fetch(async state => {
-      try {
-        const templates = this._searchKeyword
-          ? await EdgelessTemplatePanel.templates.search(this._searchKeyword)
-          : await EdgelessTemplatePanel.templates.list(this._currentCategory);
-
-        if (state.canceled) return;
-
-        this._templates = templates;
-      } catch (e) {
-        if (state.canceled) return;
-
-        console.error('Failed to load templates', e);
-      }
-    });
-  }
-
   private _getLocalSelectedCategory() {
-    return this.edgeless.service.editPropsStore.getItem('templateCache');
+    return this.edgeless.service.editPropsStore.getStorage('templateCache');
   }
 
-  private _createTemplateJob(type: string) {
-    const middlewares: ((job: TemplateJob) => void)[] = [];
-    const service = this.edgeless.service;
-
-    if (type === 'template') {
-      const currentContentBound = getCommonBound(
-        (
-          service.blocks.map(block => Bound.deserialize(block.xywh)) as IBound[]
-        ).concat(service.elements)
-      );
-
-      if (currentContentBound) {
-        currentContentBound.x +=
-          currentContentBound.w + 20 / service.viewport.zoom;
-        middlewares.push(createInsertPlaceMiddleware(currentContentBound));
-      }
-
-      const idxGenerator = service.layer.createIndexGenerator(true);
-
-      middlewares.push(
-        createRegenerateIndexMiddleware((type: string) => idxGenerator(type))
-      );
+  private async _initCategory() {
+    try {
+      this._categories = await EdgelessTemplatePanel.templates.categories();
+      this._currentCategory =
+        this._getLocalSelectedCategory() ?? this._categories[0];
+      this._updateTemplates();
+    } catch (e) {
+      console.error('Failed to load categories', e);
     }
+  }
 
-    if (type === 'sticker') {
-      middlewares.push(
-        createStickerMiddleware(service.viewport.center, () =>
-          service.layer.generateIndex('affine:image')
-        )
-      );
-    }
-
-    middlewares.push(replaceIdMiddleware);
-
-    return this.edgeless.service.TemplateJob.create({
-      model: this.edgeless.surfaceBlockModel,
-      type,
-      middlewares,
+  private _initDragController() {
+    if (this.draggableController) return;
+    this.draggableController = new EdgelessDraggableElementController(this, {
+      service: this.edgeless.service,
+      edgeless: this.edgeless,
+      clickToDrag: true,
+      standardWidth: 560,
+      onOverlayCreated: overlay => {
+        this.isDragging = true;
+        overlay.mask.style.color = 'transparent';
+      },
+      onDrop: (el, bound) => {
+        this._insertTemplate(el.data, bound)
+          .finally(() => {
+            this.isDragging = false;
+          })
+          .catch(console.error);
+      },
+      onCanceled: () => {
+        this.isDragging = false;
+      },
     });
   }
 
-  private async _insertTemplate(template: Template) {
+  private async _insertTemplate(template: Template, bound: Bound) {
     this._loadingTemplate = template;
 
     template = cloneDeep(template);
 
-    const templateJob = this._createTemplateJob(template.type);
+    const center = {
+      x: bound.x + bound.w / 2,
+      y: bound.y + bound.h / 2,
+    };
+    const templateJob = this._createTemplateJob(template.type, center);
     const service = this.edgeless.service;
 
     try {
@@ -384,12 +351,8 @@ export class EdgelessTemplatePanel extends WithDisposable(LitElement) {
       }
     } finally {
       this._loadingTemplate = null;
-      this._closePanel();
+      this.edgeless.service.tool.setEdgelessTool({ type: 'default' });
     }
-  }
-
-  private _closePanel() {
-    this.dispatchEvent(new CustomEvent('closepanel'));
   }
 
   private _updateSearchKeyword(inputEvt: InputEvent) {
@@ -397,11 +360,67 @@ export class EdgelessTemplatePanel extends WithDisposable(LitElement) {
     this._updateTemplates();
   }
 
+  private _updateTemplates() {
+    this._fetch(async state => {
+      try {
+        const templates = this._searchKeyword
+          ? await EdgelessTemplatePanel.templates.search(this._searchKeyword)
+          : await EdgelessTemplatePanel.templates.list(this._currentCategory);
+
+        if (state.canceled) return;
+
+        this._templates = templates;
+      } catch (e) {
+        if (state.canceled) return;
+
+        console.error('Failed to load templates', e);
+      }
+    });
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this._initDragController();
+
+    this.addEventListener('keydown', stopPropagation, false);
+    this._disposables.add(() => {
+      if (this._currentCategory) {
+        this.edgeless.service.editPropsStore.setStorage(
+          'templateCache',
+          this._currentCategory
+        );
+      }
+    });
+  }
+
+  override firstUpdated() {
+    requestConnectedFrame(() => {
+      this._disposables.addFromEvent(document, 'click', evt => {
+        if (this.contains(evt.target as HTMLElement)) {
+          return;
+        }
+
+        this._closePanel();
+      });
+    }, this);
+    this._disposables.addFromEvent(this, 'click', stopPropagation);
+    this._disposables.addFromEvent(this, 'wheel', stopPropagation);
+
+    this._initCategory().catch(() => {});
+  }
+
   override render() {
     const { _categories, _currentCategory, _templates } = this;
+    const { draggingElement } = this.draggableController?.states || {};
 
     return html`
-      <div class="edgeless-templates-panel">
+      <div
+        class="edgeless-templates-panel"
+        style=${styleMap({
+          opacity: this.isDragging ? '0' : '1',
+          transition: 'opacity 0.2s',
+        })}
+      >
         <div class="search-bar">
           <input
             class="search-input"
@@ -444,22 +463,40 @@ export class EdgelessTemplatePanel extends WithDisposable(LitElement) {
                     _templates,
                     template => template.name,
                     template => {
+                      const preview = template.preview
+                        ? template.preview.startsWith('<svg')
+                          ? html`${unsafeSVG(template.preview)}`
+                          : html`<img
+                              src="${template.preview}"
+                              class="template-preview"
+                            />`
+                        : defaultPreview;
+
+                      const isBeingDragged =
+                        draggingElement &&
+                        draggingElement.data.name === template.name;
                       return html`
                         <div
                           class=${`template-item ${
                             template === this._loadingTemplate ? 'loading' : ''
                           }`}
+                          style=${styleMap({
+                            opacity: isBeingDragged ? '0' : '1',
+                          })}
                           data-hover-text="Add"
-                          @click=${() => this._insertTemplate(template)}
+                          @mousedown=${(e: MouseEvent) =>
+                            this.draggableController.onMouseDown(e, {
+                              data: template,
+                              preview,
+                            })}
+                          @touchstart=${(e: TouchEvent) => {
+                            this.draggableController.onTouchStart(e, {
+                              data: template,
+                              preview,
+                            });
+                          }}
                         >
-                          ${template.preview
-                            ? template.preview.startsWith('<svg')
-                              ? html`${unsafeSVG(template.preview)}`
-                              : html`<img
-                                  src="${template.preview}"
-                                  class="template-preview"
-                                />`
-                            : defaultPreview}
+                          ${preview}
                           ${template === this._loadingTemplate
                             ? html`<affine-template-loading></affine-template-loading>`
                             : nothing}
@@ -483,6 +520,30 @@ export class EdgelessTemplatePanel extends WithDisposable(LitElement) {
       </div>
     `;
   }
+
+  @state()
+  private accessor _categories: string[] = [];
+
+  @state()
+  private accessor _currentCategory = '';
+
+  @state()
+  private accessor _loading = false;
+
+  @state()
+  private accessor _loadingTemplate: Template | null = null;
+
+  @state()
+  private accessor _searchKeyword = '';
+
+  @state()
+  private accessor _templates: Template[] = [];
+
+  @property({ attribute: false })
+  accessor edgeless!: EdgelessRootBlockComponent;
+
+  @state()
+  accessor isDragging = false;
 }
 
 declare global {

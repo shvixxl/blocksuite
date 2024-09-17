@@ -5,12 +5,9 @@ export interface Disposable {
 }
 
 export class DisposableGroup implements Disposable {
-  private _disposed = false;
   private _disposables: Disposable[] = [];
 
-  get disposed() {
-    return this._disposed;
-  }
+  private _disposed = false;
 
   /**
    * Add to group to be disposed with others.
@@ -32,6 +29,7 @@ export class DisposableGroup implements Disposable {
     handler: (e: WindowEventMap[N]) => void,
     options?: boolean | AddEventListenerOptions
   ): void;
+
   addFromEvent<N extends keyof DocumentEventMap>(
     element: Document,
     eventName: N,
@@ -62,6 +60,10 @@ export class DisposableGroup implements Disposable {
     disposeAll(this._disposables);
     this._disposables = [];
     this._disposed = true;
+  }
+
+  get disposed() {
+    return this._disposed;
   }
 }
 

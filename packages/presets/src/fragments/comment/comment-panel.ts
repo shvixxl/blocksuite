@@ -1,8 +1,8 @@
-import type { EditorHost } from '@blocksuite/block-std';
 import { ShadowlessElement, WithDisposable } from '@blocksuite/block-std';
-import { assertExists } from '@blocksuite/global/utils';
 import { css, html } from 'lit';
 import { customElement, property, query } from 'lit/decorators.js';
+
+import type { AffineEditorContainer } from '../../editors/editor-container.js';
 
 import { CommentInput } from './comment-input.js';
 import { CommentManager } from './comment-manager.js';
@@ -58,23 +58,31 @@ export class CommentPanel extends WithDisposable(ShadowlessElement) {
     }
   `;
 
-  @property({ attribute: false })
-  accessor host!: EditorHost;
-
-  @query('.comment-panel-container')
-  private accessor _container!: HTMLDivElement;
-
   commentManager: CommentManager | null = null;
+
+  private _addComment() {
+    const textSelection = this.editor.host?.selection.find('text');
+    if (!textSelection) return;
+
+    const commentInput = new CommentInput();
+    if (!this.commentManager) return;
+
+    commentInput.manager = this.commentManager;
+    commentInput.onSubmit = () => {
+      this.requestUpdate();
+    };
+    this._container.append(commentInput);
+  }
 
   override connectedCallback() {
     super.connectedCallback();
 
-    assertExists(this.host);
-    this.commentManager = new CommentManager(this.host);
+    if (!this.editor.host) return;
+    this.commentManager = new CommentManager(this.editor.host);
   }
 
   override render() {
-    assertExists(this.commentManager);
+    if (!this.commentManager) return;
     const comments = this.commentManager.getComments();
 
     return html`<div class="comment-panel-container">
@@ -95,18 +103,11 @@ export class CommentPanel extends WithDisposable(ShadowlessElement) {
     </div>`;
   }
 
-  private _addComment() {
-    const textSelection = this.host.selection.find('text');
-    if (!textSelection) return;
+  @query('.comment-panel-container')
+  private accessor _container!: HTMLDivElement;
 
-    const commentInput = new CommentInput();
-    assertExists(this.commentManager);
-    commentInput.manager = this.commentManager;
-    commentInput.onSubmit = () => {
-      this.requestUpdate();
-    };
-    this._container.append(commentInput);
-  }
+  @property({ attribute: false })
+  accessor editor!: AffineEditorContainer;
 }
 
 declare global {

@@ -1,49 +1,53 @@
+import type { EditorHost } from '@blocksuite/block-std';
+
 import { PathFinder } from '@blocksuite/block-std';
+import { Bound } from '@blocksuite/global/utils';
 import { assertExists } from '@blocksuite/global/utils';
 import {
   type BlockModel,
-  type BlockSelector,
   BlockViewType,
   type Doc,
+  type Query,
 } from '@blocksuite/store';
-import { css, render, type TemplateResult } from 'lit';
+import { type TemplateResult, css, render } from 'lit';
 
 import type { EmbedLinkedDocBlockComponent } from '../../embed-linked-doc-block/embed-linked-doc-block.js';
 import type { EmbedSyncedDocCard } from '../../embed-synced-doc-block/components/embed-synced-doc-card.js';
 import type { ImageBlockModel } from '../../image-block/index.js';
 import type { NoteBlockModel } from '../../note-block/note-model.js';
-import { EdgelessBlockModel } from '../../root-block/edgeless/type.js';
+
+import { GfxBlockModel } from '../../root-block/edgeless/block-model.js';
 import {
   getElementProps,
   sortEdgelessElements,
 } from '../../root-block/edgeless/utils/clone-utils.js';
 import { isNoteBlock } from '../../root-block/edgeless/utils/query.js';
 import { SpecProvider } from '../../specs/utils/spec-provider.js';
-import { Bound, getCommonBound } from '../../surface-block/utils/bound.js';
+import { getCommonBound } from '../../surface-block/utils/bound.js';
 import { getSurfaceBlock } from '../../surface-ref-block/utils.js';
 import { EMBED_CARD_HEIGHT } from '../consts.js';
-import { NoteDisplayMode } from '../types.js';
+import { type DocMode, NoteDisplayMode } from '../types.js';
 import { getBlockProps } from './block-props.js';
 import { matchFlavours } from './model.js';
 
 export const embedNoteContentStyles = css`
   .affine-embed-doc-content-note-blocks affine-divider,
   .affine-embed-doc-content-note-blocks affine-divider > * {
-    margin-top: 0px;
-    margin-bottom: 0px;
+    margin-top: 0px !important;
+    margin-bottom: 0px !important;
     padding-top: 8px;
     padding-bottom: 8px;
   }
   .affine-embed-doc-content-note-blocks affine-paragraph,
   .affine-embed-doc-content-note-blocks affine-list {
-    margin-top: 4px;
-    margin-bottom: 4px;
+    margin-top: 4px !important;
+    margin-bottom: 4px !important;
     padding: 0 2px;
   }
   .affine-embed-doc-content-note-blocks affine-paragraph *,
   .affine-embed-doc-content-note-blocks affine-list * {
-    margin-top: 0px;
-    margin-bottom: 0px;
+    margin-top: 0px !important;
+    margin-bottom: 0px !important;
     padding-top: 0;
     padding-bottom: 0;
     line-height: 20px;
@@ -64,8 +68,8 @@ export const embedNoteContentStyles = css`
   .affine-embed-doc-content-note-blocks affine-paragraph:has(.h4),
   .affine-embed-doc-content-note-blocks affine-paragraph:has(.h5),
   .affine-embed-doc-content-note-blocks affine-paragraph:has(.h6) {
-    margin-top: 6px;
-    margin-bottom: 4px;
+    margin-top: 6px !important;
+    margin-bottom: 4px !important;
     padding: 0 2px;
   }
   .affine-embed-doc-content-note-blocks affine-paragraph:has(.h1) *,
@@ -74,8 +78,8 @@ export const embedNoteContentStyles = css`
   .affine-embed-doc-content-note-blocks affine-paragraph:has(.h4) *,
   .affine-embed-doc-content-note-blocks affine-paragraph:has(.h5) *,
   .affine-embed-doc-content-note-blocks affine-paragraph:has(.h6) * {
-    margin-top: 0px;
-    margin-bottom: 0px;
+    margin-top: 0px !important;
+    margin-bottom: 0px !important;
     padding-top: 0;
     padding-bottom: 0;
     line-height: 20px;
@@ -86,8 +90,8 @@ export const embedNoteContentStyles = css`
   .affine-embed-linked-doc-block.horizontal {
     affine-paragraph,
     affine-list {
-      margin-top: 0;
-      margin-bottom: 0;
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
       max-height: 40px;
       overflow: hidden;
       display: flex;
@@ -99,11 +103,75 @@ export const embedNoteContentStyles = css`
     }
     affine-paragraph .quote::after {
       height: 20px;
-      margin-top: 4px;
-      margin-bottom: 4px;
+      margin-top: 4px !important;
+      margin-bottom: 4px !important;
     }
   }
 `;
+
+export function promptDocTitle(host: EditorHost, autofill?: string) {
+  const notification =
+    host.std.spec.getService('affine:page').notificationService;
+  if (!notification) return Promise.resolve(undefined);
+
+  return notification.prompt({
+    title: 'Create linked doc',
+    message: 'Enter a title for the new doc.',
+    placeholder: 'Untitled',
+    autofill,
+    confirmText: 'Confirm',
+    cancelText: 'Cancel',
+  });
+}
+
+export function getTitleFromSelectedModels(selectedModels: BlockModel[]) {
+  const firstBlock = selectedModels[0];
+  if (
+    matchFlavours(firstBlock, ['affine:paragraph']) &&
+    firstBlock.type.startsWith('h')
+  ) {
+    return firstBlock.text.toString();
+  }
+  return undefined;
+}
+
+export function notifyDocCreated(host: EditorHost, doc: Doc) {
+  const notification =
+    host.std.spec.getService('affine:page').notificationService;
+  if (!notification) return;
+
+  const abortController = new AbortController();
+  const clear = () => {
+    doc.history.off('stack-item-added', addHandler);
+    doc.history.off('stack-item-popped', popHandler);
+    disposable.dispose();
+  };
+  const closeNotify = () => {
+    abortController.abort();
+    clear();
+  };
+
+  // edit or undo or switch doc, close notify toast
+  const addHandler = doc.history.on('stack-item-added', closeNotify);
+  const popHandler = doc.history.on('stack-item-popped', closeNotify);
+  const disposable = host.slots.unmounted.on(closeNotify);
+
+  notification.notify({
+    title: 'Linked doc created',
+    message: 'You can click undo to recovery block content',
+    accent: 'info',
+    duration: 10 * 1000,
+    action: {
+      label: 'Undo',
+      onClick: () => {
+        doc.undo();
+        clear();
+      },
+    },
+    abort: abortController.signal,
+    onClose: clear,
+  });
+}
 
 export function renderLinkedDocInCard(
   card: EmbedLinkedDocBlockComponent | EmbedSyncedDocCard
@@ -122,18 +190,47 @@ export function renderLinkedDocInCard(
   });
 }
 
-function getNotesFromDoc(linkedDoc: Doc) {
-  const note = linkedDoc.root?.children.filter(
+export function getNotesFromDoc(doc: Doc) {
+  const notes = doc.root?.children.filter(
     child =>
       matchFlavours(child, ['affine:note']) &&
       child.displayMode !== NoteDisplayMode.EdgelessOnly
   );
 
-  if (!note || !note.length) {
+  if (!notes || !notes.length) {
     return null;
   }
 
-  return note;
+  return notes;
+}
+
+export function isEmptyDoc(doc: Doc | null, mode: DocMode) {
+  if (!doc) {
+    return true;
+  }
+
+  if (mode === 'page') {
+    const notes = getNotesFromDoc(doc);
+    if (!notes || !notes.length) {
+      return true;
+    }
+    return notes.every(note => isEmptyNote(note));
+  } else {
+    const surface = getSurfaceBlock(doc);
+    if (surface?.elementModels.length || doc.blockSize > 2) {
+      return false;
+    }
+    return true;
+  }
+}
+
+export function isEmptyNote(note: BlockModel) {
+  return note.children.every(block => {
+    return (
+      block.flavour === 'affine:paragraph' &&
+      (!block.text || block.text.length === 0)
+    );
+  });
 }
 
 function filterTextModel(model: BlockModel) {
@@ -161,7 +258,6 @@ async function renderNoteContent(
   if (!notes) {
     return;
   }
-  card.isNoteContentEmpty = false;
 
   const noteChildren = notes.flatMap(note =>
     note.children.filter(filterTextModel)
@@ -170,6 +266,8 @@ async function renderNoteContent(
   if (!noteChildren.length) {
     return;
   }
+
+  card.isNoteContentEmpty = false;
 
   const cardStyle = card.model.style;
 
@@ -205,12 +303,11 @@ async function renderNoteContent(
       parent = doc.blockCollection.crud.getParent(parent);
     }
   });
-  const selector: BlockSelector = block => {
-    return ids.includes(block.id)
-      ? BlockViewType.Display
-      : BlockViewType.Hidden;
+  const query: Query = {
+    mode: 'strict',
+    match: ids.map(id => ({ id, viewType: BlockViewType.Display })),
   };
-  const previewDoc = doc.blockCollection.getDoc({ selector });
+  const previewDoc = doc.blockCollection.getDoc({ query });
   const previewSpec = SpecProvider.getInstance().getSpec('page:preview');
   const previewTemplate = card.host.renderSpecPortal(
     previewDoc,
@@ -299,8 +396,8 @@ async function renderEdgelessAbstract(
   ).map(element => Bound.deserialize(element.xywh));
   const bound = getCommonBound(bounds);
   if (bound) {
-    renderer.onResize();
-    renderer.setViewportByBound(bound);
+    renderer.viewport.onResize();
+    renderer.viewport.setViewportByBound(bound);
   } else {
     card.isBannerEmpty = true;
   }
@@ -383,17 +480,8 @@ export function convertSelectedBlocksToLinkedDoc(
   const firstBlock = selectedModels[0];
   assertExists(firstBlock);
   // if title undefined, use the first heading block content as doc title
-  let title = docTitle;
-  let blocks = selectedModels;
-  if (
-    !docTitle &&
-    matchFlavours(firstBlock, ['affine:paragraph']) &&
-    firstBlock.type.match(/^h[1-6]$/)
-  ) {
-    title = firstBlock.text.toString();
-    blocks = selectedModels.slice(1);
-  }
-  const linkedDoc = createLinkedDocFromBlocks(doc, blocks, title);
+  const title = docTitle || getTitleFromSelectedModels(selectedModels);
+  const linkedDoc = createLinkedDocFromBlocks(doc, selectedModels, title);
   // insert linked doc card
   doc.addSiblingBlocks(
     firstBlock,
@@ -462,24 +550,24 @@ export function createLinkedDocFromNote(
 }
 
 export function createLinkedDocFromEdgelessElements(
-  doc: Doc,
-  elements: BlockSuite.EdgelessModelType[],
+  host: EditorHost,
+  elements: BlockSuite.EdgelessModel[],
   docTitle?: string
 ) {
-  const linkedDoc = doc.collection.createDoc({});
+  const linkedDoc = host.doc.collection.createDoc({});
   linkedDoc.load(() => {
     const rootId = linkedDoc.addBlock('affine:page', {
-      title: new doc.Text(docTitle),
+      title: new host.doc.Text(docTitle),
     });
     const surfaceId = linkedDoc.addBlock('affine:surface', {}, rootId);
     const surface = getSurfaceBlock(linkedDoc);
     if (!surface) return;
 
     const sortedElements = sortEdgelessElements(elements);
-    const ids: Map<string, string> = new Map();
+    const ids = new Map<string, string>();
     sortedElements.forEach(model => {
       let newId = model.id;
-      if (model instanceof EdgelessBlockModel) {
+      if (model instanceof GfxBlockModel) {
         const blockProps = getBlockProps(model);
         if (isNoteBlock(model)) {
           newId = linkedDoc.addBlock('affine:note', blockProps, rootId);
@@ -501,6 +589,7 @@ export function createLinkedDocFromEdgelessElements(
       ids.set(model.id, newId);
     });
   });
-
+  const pageService = host.spec.getService('affine:page');
+  pageService.docModeService.setMode('edgeless', linkedDoc.id);
   return linkedDoc;
 }

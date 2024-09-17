@@ -1,6 +1,7 @@
 import type { TextSelection } from '@blocksuite/block-std';
-import { ShadowlessElement, WithDisposable } from '@blocksuite/block-std';
 import type { RichText } from '@blocksuite/blocks';
+
+import { ShadowlessElement, WithDisposable } from '@blocksuite/block-std';
 import { DocCollection } from '@blocksuite/store';
 import { css, html, nothing } from 'lit';
 import { customElement, property, query } from 'lit/decorators.js';
@@ -9,6 +10,29 @@ import type { Comment, CommentManager } from './comment-manager.js';
 
 @customElement('comment-input')
 export class CommentInput extends WithDisposable(ShadowlessElement) {
+  private _cancel = () => {
+    this.remove();
+  };
+
+  private _submit = (textSelection: TextSelection) => {
+    const deltas = this._editor.inlineEditor?.yTextDeltas;
+    if (!deltas) {
+      this.remove();
+      return;
+    }
+
+    const yText = new DocCollection.Y.Text();
+    yText.applyDelta(deltas);
+    const comment = this.manager.addComment(textSelection, {
+      author: 'Anonymous',
+      text: yText,
+    });
+
+    this.onSubmit?.(comment);
+
+    this.remove();
+  };
+
   static override styles = css`
     .comment-input-container {
       padding: 16px;
@@ -40,42 +64,6 @@ export class CommentInput extends WithDisposable(ShadowlessElement) {
       margin-top: 8px;
     }
   `;
-
-  @property({ attribute: false })
-  accessor manager!: CommentManager;
-
-  @property({ attribute: false })
-  accessor onSubmit: undefined | ((comment: Comment) => void) = undefined;
-
-  @query('rich-text')
-  private accessor _editor!: RichText;
-
-  get host() {
-    return this.manager.host;
-  }
-
-  private _submit = (textSelection: TextSelection) => {
-    const deltas = this._editor.inlineEditor?.yTextDeltas;
-    if (!deltas) {
-      this.remove();
-      return;
-    }
-
-    const yText = new DocCollection.Y.Text();
-    yText.applyDelta(deltas);
-    const comment = this.manager.addComment(textSelection, {
-      author: 'Anonymous',
-      text: yText,
-    });
-
-    this.onSubmit?.(comment);
-
-    this.remove();
-  };
-
-  private _cancel = () => {
-    this.remove();
-  };
 
   override render() {
     const textSelection = this.host.selection.find('text');
@@ -115,6 +103,19 @@ export class CommentInput extends WithDisposable(ShadowlessElement) {
       </div>
     </div>`;
   }
+
+  get host() {
+    return this.manager.host;
+  }
+
+  @query('rich-text')
+  private accessor _editor!: RichText;
+
+  @property({ attribute: false })
+  accessor manager!: CommentManager;
+
+  @property({ attribute: false })
+  accessor onSubmit: undefined | ((comment: Comment) => void) = undefined;
 }
 
 declare global {

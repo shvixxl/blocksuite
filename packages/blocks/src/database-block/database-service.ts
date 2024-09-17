@@ -1,6 +1,10 @@
+import type { BlockModel, Doc } from '@blocksuite/store';
+
 import { BlockService } from '@blocksuite/block-std';
 import { assertExists } from '@blocksuite/global/utils';
-import type { BlockModel, Doc } from '@blocksuite/store';
+
+import type { ViewMeta } from './data-view/view/data-view.js';
+import type { DatabaseBlockModel } from './database-model.js';
 
 import { InlineManager } from '../_common/inline/inline-manager.js';
 import {
@@ -11,29 +15,17 @@ import { affineInlineMarkdownMatches } from '../_common/inline/presets/markdown.
 import { ReferenceNodeConfig } from '../_common/inline/presets/nodes/reference-node/reference-config.js';
 import { DatabaseSelection } from './data-view/common/selection.js';
 import { viewPresets } from './data-view/index.js';
-import type { ViewMeta } from './data-view/view/data-view.js';
-import type { DatabaseBlockModel } from './database-model.js';
 import { databaseViewInitEmpty, databaseViewInitTemplate } from './utils.js';
 
 export class DatabaseBlockService<
   TextAttributes extends AffineTextAttributes = AffineTextAttributes,
 > extends BlockService<DatabaseBlockModel> {
+  databaseViewInitEmpty = databaseViewInitEmpty;
+
   readonly inlineManager = new InlineManager<TextAttributes>();
+
   readonly referenceNodeConfig = new ReferenceNodeConfig();
 
-  override mounted(): void {
-    super.mounted();
-    this.selectionManager.register(DatabaseSelection);
-
-    this.referenceNodeConfig.setDoc(this.doc);
-
-    const inlineSpecs = getAffineInlineSpecsWithReference(
-      this.referenceNodeConfig
-    );
-    this.inlineManager.registerSpecs(inlineSpecs);
-    this.inlineManager.registerMarkdownMatches(affineInlineMarkdownMatches);
-  }
-  databaseViewInitEmpty = databaseViewInitEmpty;
   viewPresets = viewPresets;
 
   initDatabaseBlock(
@@ -53,5 +45,18 @@ export class DatabaseBlockService<
       doc.addBlock('affine:paragraph', {}, parent.id);
     }
     blockModel.applyColumnUpdate();
+  }
+
+  override mounted(): void {
+    super.mounted();
+    this.selectionManager.register(DatabaseSelection);
+
+    this.referenceNodeConfig.setDoc(this.doc);
+
+    const inlineSpecs = getAffineInlineSpecsWithReference(
+      this.referenceNodeConfig
+    );
+    this.inlineManager.registerSpecs(inlineSpecs);
+    this.inlineManager.registerMarkdownMatches(affineInlineMarkdownMatches);
   }
 }

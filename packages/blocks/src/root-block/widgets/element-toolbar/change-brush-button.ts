@@ -1,123 +1,191 @@
-import '../../edgeless/components/buttons/tool-icon-button.js';
-import '../../edgeless/components/buttons/menu-button.js';
-import '../../edgeless/components/panel/color-panel.js';
-import '../../edgeless/components/panel/line-width-panel.js';
-
 import { WithDisposable } from '@blocksuite/block-std';
-import { html, LitElement, nothing } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
+import { LitElement, html, nothing } from 'lit';
+import { customElement, property, query, state } from 'lit/decorators.js';
+import { when } from 'lit/directives/when.js';
 
-import type { CssVariableName } from '../../../_common/theme/css-variables.js';
-import { LineWidth } from '../../../_common/types.js';
-import { countBy, maxBy } from '../../../_common/utils/iterable.js';
+import type { ColorScheme } from '../../../_common/theme/theme-observer.js';
+import type { BrushProps } from '../../../surface-block/element-model/brush.js';
 import type { BrushElementModel } from '../../../surface-block/index.js';
-import {
-  type ColorEvent,
-  GET_DEFAULT_LINE_COLOR,
-} from '../../edgeless/components/panel/color-panel.js';
+import type { EdgelessColorPickerButton } from '../../edgeless/components/color-picker/button.js';
+import type { PickColorEvent } from '../../edgeless/components/color-picker/types.js';
+import type { ColorEvent } from '../../edgeless/components/panel/color-panel.js';
 import type { LineWidthEvent } from '../../edgeless/components/panel/line-width-panel.js';
 import type { EdgelessRootBlockComponent } from '../../edgeless/edgeless-root-block.js';
 
+import '../../../_common/components/toolbar/icon-button.js';
+import '../../../_common/components/toolbar/menu-button.js';
+import '../../../_common/components/toolbar/separator.js';
+import { LineWidth } from '../../../_common/types.js';
+import { countBy, maxBy } from '../../../_common/utils/iterable.js';
+import {
+  packColor,
+  packColorsWithColorScheme,
+} from '../../edgeless/components/color-picker/utils.js';
+import '../../edgeless/components/panel/color-panel.js';
+import {
+  GET_DEFAULT_LINE_COLOR,
+  LINE_COLORS,
+} from '../../edgeless/components/panel/color-panel.js';
+import '../../edgeless/components/panel/line-width-panel.js';
+
 function getMostCommonColor(
-  elements: BrushElementModel[]
-): CssVariableName | null {
-  const shapeTypes = countBy(elements, (ele: BrushElementModel) => ele.color);
-  const max = maxBy(Object.entries(shapeTypes), ([_k, count]) => count);
-  return max ? (max[0] as CssVariableName) : GET_DEFAULT_LINE_COLOR();
+  elements: BrushElementModel[],
+  colorScheme: ColorScheme
+): string {
+  const colors = countBy(elements, (ele: BrushElementModel) => {
+    return typeof ele.color === 'object'
+      ? (ele.color[colorScheme] ?? ele.color.normal ?? null)
+      : ele.color;
+  });
+  const max = maxBy(Object.entries(colors), ([_k, count]) => count);
+  return max ? (max[0] as string) : GET_DEFAULT_LINE_COLOR();
 }
 
 function getMostCommonSize(elements: BrushElementModel[]): LineWidth {
-  const shapeTypes = countBy(
-    elements,
-    (ele: BrushElementModel) => ele.lineWidth
-  );
-  const max = maxBy(Object.entries(shapeTypes), ([_k, count]) => count);
+  const sizes = countBy(elements, ele => ele.lineWidth);
+  const max = maxBy(Object.entries(sizes), ([_k, count]) => count);
   return max ? (Number(max[0]) as LineWidth) : LineWidth.Four;
+}
+
+function notEqual<K extends keyof BrushProps>(key: K, value: BrushProps[K]) {
+  return (element: BrushElementModel) => element[key] !== value;
 }
 
 @customElement('edgeless-change-brush-button')
 export class EdgelessChangeBrushButton extends WithDisposable(LitElement) {
-  @property({ attribute: false })
-  accessor elements: BrushElementModel[] = [];
+  private _setBrushColor = ({ detail: color }: ColorEvent) => {
+    this._setBrushProp('color', color);
+    this._selectedColor = color;
+  };
 
-  @property({ attribute: false })
-  accessor edgeless!: EdgelessRootBlockComponent;
+  private _setLineWidth = ({ detail: lineWidth }: LineWidthEvent) => {
+    this._setBrushProp('lineWidth', lineWidth);
+    this._selectedSize = lineWidth;
+  };
 
-  @state()
-  private accessor _selectedColor: string | null = null;
+  pickColor = (event: PickColorEvent) => {
+    if (event.type === 'pick') {
+      this.elements.forEach(ele =>
+        this.service.updateElement(
+          ele.id,
+          packColor('color', { ...event.detail })
+        )
+      );
+      return;
+    }
 
-  @state()
-  private accessor _selectedSize: LineWidth | null = LineWidth.Four;
+    this.elements.forEach(ele =>
+      ele[event.type === 'start' ? 'stash' : 'pop']('color')
+    );
+  };
 
-  get surface() {
-    return this.edgeless.surface;
+  private _setBrushProp<K extends keyof BrushProps>(
+    key: K,
+    value: BrushProps[K]
+  ) {
+    this.doc.captureSync();
+    this.elements
+      .filter(notEqual(key, value))
+      .forEach(element =>
+        this.service.updateElement(element.id, { [key]: value })
+      );
+  }
+
+  override render() {
+    const colorScheme = this.edgeless.surface.renderer.getColorScheme();
+    const elements = this.elements;
+    const { selectedSize, selectedColor } = this;
+
+    return html`
+      <edgeless-line-width-panel
+        .selectedSize=${selectedSize}
+        @select=${this._setLineWidth}
+      >
+      </edgeless-line-width-panel>
+
+      <editor-toolbar-separator></editor-toolbar-separator>
+
+      ${when(
+        this.edgeless.doc.awarenessStore.getFlag('enable_color_picker'),
+        () => {
+          const { type, colors } = packColorsWithColorScheme(
+            colorScheme,
+            selectedColor,
+            elements[0].color
+          );
+
+          return html`
+            <edgeless-color-picker-button
+              class="color"
+              .label=${'Color'}
+              .pick=${this.pickColor}
+              .color=${selectedColor}
+              .colors=${colors}
+              .colorType=${type}
+              .palettes=${LINE_COLORS}
+            >
+            </edgeless-color-picker-button>
+          `;
+        },
+        () => html`
+          <editor-menu-button
+            .contentPadding=${'8px'}
+            .button=${html`
+              <editor-icon-button aria-label="Color" .tooltip=${'Color'}>
+                <edgeless-color-button
+                  .color=${selectedColor}
+                ></edgeless-color-button>
+              </editor-icon-button>
+            `}
+          >
+            <edgeless-color-panel
+              .value=${selectedColor}
+              @select=${this._setBrushColor}
+            >
+            </edgeless-color-panel>
+          </editor-menu-button>
+        `
+      )}
+    `;
   }
 
   get doc() {
     return this.edgeless.doc;
   }
 
+  get selectedColor() {
+    const colorScheme = this.edgeless.surface.renderer.getColorScheme();
+    return (
+      this._selectedColor ?? getMostCommonColor(this.elements, colorScheme)
+    );
+  }
+
+  get selectedSize() {
+    return this._selectedSize ?? getMostCommonSize(this.elements);
+  }
+
   get service() {
     return this.surface.edgeless.service;
   }
 
-  private _setLineWidth(size: LineWidth) {
-    this.doc.captureSync();
-    this.elements.forEach(element => {
-      if (element.lineWidth !== size) {
-        this.service.updateElement(element.id, {
-          lineWidth: size,
-        });
-      }
-    });
+  get surface() {
+    return this.edgeless.surface;
   }
 
-  private _setBrushColor(color: CssVariableName) {
-    this.doc.captureSync();
-    this.elements.forEach(element => {
-      if (element.color !== color) {
-        this.service.updateElement(element.id, {
-          color,
-        });
-      }
-    });
-    if (color && this._selectedColor !== color) {
-      this._selectedColor = color;
-    }
-  }
+  @state()
+  private accessor _selectedColor: string | null = null;
 
-  override render() {
-    this._selectedColor = getMostCommonColor(this.elements);
-    this._selectedSize = getMostCommonSize(this.elements);
+  @state()
+  private accessor _selectedSize: LineWidth | null = null;
 
-    return html`
-      <edgeless-line-width-panel
-        .selectedSize=${this._selectedSize}
-        @select=${(e: LineWidthEvent) => this._setLineWidth(e.detail)}
-      >
-      </edgeless-line-width-panel>
+  @query('edgeless-color-picker-button.color')
+  accessor colorButton!: EdgelessColorPickerButton;
 
-      <edgeless-menu-divider></edgeless-menu-divider>
+  @property({ attribute: false })
+  accessor edgeless!: EdgelessRootBlockComponent;
 
-      <edgeless-menu-button
-        .contentPadding=${'8px'}
-        .button=${html`
-          <edgeless-tool-icon-button aria-label="Color" .tooltip=${'Color'}>
-            <edgeless-color-button
-              .color=${this._selectedColor}
-            ></edgeless-color-button>
-          </edgeless-tool-icon-button>
-        `}
-      >
-        <edgeless-color-panel
-          slot
-          .value=${this._selectedColor}
-          @select=${(e: ColorEvent) => this._setBrushColor(e.detail)}
-        >
-        </edgeless-color-panel>
-      </edgeless-menu-button>
-    `;
-  }
+  @property({ attribute: false })
+  accessor elements: BrushElementModel[] = [];
 }
 
 declare global {

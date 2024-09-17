@@ -1,17 +1,17 @@
-import { assertExists } from '@blocksuite/global/utils';
 import { html, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
+import type { EmbedGithubStyles } from './embed-github-model.js';
+import type { EmbedGithubBlockService } from './embed-github-service.js';
+
 import { EMBED_CARD_HEIGHT, EMBED_CARD_WIDTH } from '../_common/consts.js';
-import { EmbedBlockElement } from '../_common/embed-block-helper/embed-block-element.js';
+import { EmbedBlockComponent } from '../_common/embed-block-helper/embed-block-element.js';
 import { OpenIcon } from '../_common/icons/text.js';
 import { getEmbedCardIcons } from '../_common/utils/url.js';
-import type { EmbedGithubStyles } from './embed-github-model.js';
 import { type EmbedGithubModel, githubUrlRegex } from './embed-github-model.js';
-import type { EmbedGithubBlockService } from './embed-github-service.js';
 import { GithubIcon, styles } from './styles.js';
 import {
   getGithubStatusIcon,
@@ -20,26 +20,37 @@ import {
 } from './utils.js';
 
 @customElement('affine-embed-github-block')
-export class EmbedGithubBlockComponent extends EmbedBlockElement<
+export class EmbedGithubBlockComponent extends EmbedBlockComponent<
   EmbedGithubModel,
   EmbedGithubBlockService
 > {
-  static override styles = styles;
-
   override _cardStyle: (typeof EmbedGithubStyles)[number] = 'horizontal';
 
-  @state()
-  private accessor _isSelected = false;
+  static override styles = styles;
 
-  @property({ attribute: false })
-  accessor loading = false;
+  open = () => {
+    let link = this.model.url;
+    if (!link.match(/^[a-zA-Z]+:\/\//)) {
+      link = 'https://' + link;
+    }
+    window.open(link, '_blank');
+  };
 
-  private _selectBlock() {
-    const selectionManager = this.host.selection;
-    const blockSelection = selectionManager.create('block', {
-      blockId: this.blockId,
-    });
-    selectionManager.setGroup('note', [blockSelection]);
+  refreshData = () => {
+    refreshEmbedGithubUrlData(this, this.fetchAbortController.signal).catch(
+      console.error
+    );
+  };
+
+  refreshStatus = () => {
+    refreshEmbedGithubStatus(this, this.fetchAbortController.signal).catch(
+      console.error
+    );
+  };
+
+  private _handleAssigneeClick(assignee: string) {
+    const link = `https://www.github.com/${assignee}`;
+    window.open(link, '_blank');
   }
 
   private _handleClick(event: MouseEvent) {
@@ -54,26 +65,13 @@ export class EmbedGithubBlockComponent extends EmbedBlockElement<
     this.open();
   }
 
-  private _handleAssigneeClick(assignee: string) {
-    const link = `https://www.github.com/${assignee}`;
-    window.open(link, '_blank');
+  private _selectBlock() {
+    const selectionManager = this.host.selection;
+    const blockSelection = selectionManager.create('block', {
+      blockId: this.blockId,
+    });
+    selectionManager.setGroup('note', [blockSelection]);
   }
-
-  open = () => {
-    let link = this.model.url;
-    if (!link.match(/^[a-zA-Z]+:\/\//)) {
-      link = 'https://' + link;
-    }
-    window.open(link, '_blank');
-  };
-
-  refreshData = () => {
-    refreshEmbedGithubUrlData(this).catch(console.error);
-  };
-
-  refreshStatus = () => {
-    refreshEmbedGithubStatus(this).catch(console.error);
-  };
 
   override connectedCallback() {
     super.connectedCallback();
@@ -118,8 +116,6 @@ export class EmbedGithubBlockComponent extends EmbedBlockElement<
     );
 
     if (this.isInSurface) {
-      const surface = this.surface;
-      assertExists(surface);
       this.disposables.add(
         this.model.propsUpdated.on(() => {
           this.requestUpdate();
@@ -281,11 +277,15 @@ export class EmbedGithubBlockComponent extends EmbedBlockElement<
             <div class="affine-embed-github-banner">${bannerImage}</div>
           </div>
         </div>
-
-        ${this.isInSurface ? nothing : Object.values(this.widgets)}
       `
     );
   }
+
+  @state()
+  private accessor _isSelected = false;
+
+  @property({ attribute: false })
+  accessor loading = false;
 }
 
 declare global {

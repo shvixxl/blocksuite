@@ -1,74 +1,52 @@
 import { RangeManager } from '@blocksuite/block-std';
-import { Slice, Slot } from '@blocksuite/store';
+import { Slice } from '@blocksuite/store';
+import { computed } from '@lit-labs/preact-signals';
 import { css, nothing, unsafeCSS } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { html } from 'lit/static-html.js';
 
-import { BlockComponent, popMenu } from '../_common/components/index.js';
+import type { DataSource } from '../database-block/data-view/common/data-source/base.js';
+import type { NoteBlockComponent } from '../note-block/index.js';
+import type { DataViewBlockModel } from './data-view-model.js';
+
+import {
+  CaptionedBlockComponent,
+  popMenu,
+} from '../_common/components/index.js';
 import {
   CopyIcon,
   DeleteIcon,
   MoreHorizontalIcon,
 } from '../_common/icons/index.js';
 import { dataViewCommonStyle } from '../database-block/data-view/common/css-variable.js';
-import type { DataSource } from '../database-block/data-view/common/data-source/base.js';
 import {
-  DatabaseSelection,
   DataView,
   type DataViewProps,
   type DataViewSelection,
   type DataViewWidget,
   type DataViewWidgetProps,
+  DatabaseSelection,
   defineUniComponent,
   renderUniLit,
-  type ViewSource,
   widgetPresets,
 } from '../database-block/data-view/index.js';
-import type { NoteBlockComponent } from '../note-block/index.js';
 import {
   type AffineInnerModalWidget,
   EdgelessRootBlockComponent,
 } from '../root-block/index.js';
 import { AFFINE_INNER_MODAL_WIDGET } from '../root-block/widgets/inner-modal/inner-modal.js';
 import { BlockQueryDataSource } from './data-source.js';
-import type { DataViewBlockModel } from './data-view-model.js';
-import { BlockQueryViewSource } from './view-source.js';
 
 @customElement('affine-data-view')
-export class DataViewBlockComponent extends BlockComponent<DataViewBlockModel> {
-  static override styles = css`
-    ${unsafeCSS(dataViewCommonStyle('affine-database'))}
-    affine-database {
-      display: block;
-      border-radius: 8px;
-      background-color: var(--affine-background-primary-color);
-      padding: 8px;
-      margin: 8px -8px -8px;
-    }
+export class DataViewBlockComponent extends CaptionedBlockComponent<DataViewBlockModel> {
+  _bindHotkey: DataViewProps['bindHotkey'] = hotkeys => {
+    return {
+      dispose: this.host.event.bindHotkey(hotkeys, {
+        path: this.topContenteditableElement?.path ?? this.path,
+      }),
+    };
+  };
 
-    .database-block-selected {
-      background-color: var(--affine-hover-color);
-      border-radius: 4px;
-    }
-
-    .database-ops {
-      margin-top: 4px;
-      padding: 2px;
-      border-radius: 4px;
-      display: flex;
-      cursor: pointer;
-    }
-
-    .database-ops svg {
-      width: 16px;
-      height: 16px;
-      color: var(--affine-icon-color);
-    }
-
-    .database-ops:hover {
-      background-color: var(--affine-hover-color);
-    }
-  `;
   private _clickDatabaseOps = (e: MouseEvent) => {
     popMenu(e.currentTarget as HTMLElement, {
       options: {
@@ -119,79 +97,55 @@ export class DataViewBlockComponent extends BlockComponent<DataViewBlockModel> {
     });
   };
 
-  private renderDatabaseOps() {
-    if (this.doc.readonly) {
-      return nothing;
-    }
-    return html` <div class="database-ops" @click="${this._clickDatabaseOps}">
-      ${MoreHorizontalIcon}
-    </div>`;
-  }
+  private _dataSource?: DataSource;
 
-  override get topContenteditableElement() {
-    if (this.rootElement instanceof EdgelessRootBlockComponent) {
-      const note = this.closest<NoteBlockComponent>('affine-note');
-      return note;
-    }
-    return this.rootElement;
-  }
-
-  override connectedCallback() {
-    super.connectedCallback();
-
-    this.setAttribute(RangeManager.rangeSyncExcludeAttr, 'true');
-
-    this._disposables.add(
-      this.selection.slots.changed.on(selections => {
-        const databaseSelection = selections.find(
-          (selection): selection is DatabaseSelection => {
-            if (selection.blockId !== this.blockId) {
-              return false;
-            }
-            return selection instanceof DatabaseSelection;
-          }
-        );
-        this.selectionUpdated.emit(databaseSelection?.viewSelection);
-      })
-    );
-    this._disposables.add(
-      this.model.propsUpdated.on(() => {
-        this.viewSource.updateSlot.emit();
-      })
-    );
-  }
+  _handleEvent: DataViewProps['handleEvent'] = (name, handler) => {
+    return {
+      dispose: this.host.event.add(name, handler, {
+        path: this.path,
+      }),
+    };
+  };
 
   private dataView = new DataView();
 
-  get view() {
-    return this.dataView.expose;
-  }
-
-  private _dataSource?: DataSource;
-  public get dataSource(): DataSource {
-    if (!this._dataSource) {
-      this._dataSource = new BlockQueryDataSource(this.host, this.model, {
-        type: 'todo',
-      });
+  static override styles = css`
+    ${unsafeCSS(dataViewCommonStyle('affine-database'))}
+    affine-database {
+      display: block;
+      border-radius: 8px;
+      background-color: var(--affine-background-primary-color);
+      padding: 8px;
+      margin: 8px -8px -8px;
     }
-    return this._dataSource;
-  }
 
-  toolsWidget: DataViewWidget = widgetPresets.createTools({
-    table: [
-      widgetPresets.tools.filter,
-      widgetPresets.tools.expand,
-      widgetPresets.tools.search,
-      widgetPresets.tools.viewOptions,
-      widgetPresets.tools.tableAddRow,
-    ],
-    kanban: [
-      widgetPresets.tools.filter,
-      widgetPresets.tools.expand,
-      widgetPresets.tools.search,
-      widgetPresets.tools.viewOptions,
-    ],
-  });
+    .database-block-selected {
+      background-color: var(--affine-hover-color);
+      border-radius: 4px;
+    }
+
+    .database-ops {
+      margin-top: 4px;
+      padding: 2px;
+      border-radius: 4px;
+      display: flex;
+      cursor: pointer;
+    }
+
+    .database-ops svg {
+      width: 16px;
+      height: 16px;
+      color: var(--affine-icon-color);
+    }
+
+    .database-ops:hover {
+      background-color: var(--affine-hover-color);
+    }
+  `;
+
+  getRootService = () => {
+    return this.std.spec.getService('affine:page');
+  };
 
   headerWidget: DataViewWidget = defineUniComponent(
     (props: DataViewWidgetProps) => {
@@ -215,13 +169,17 @@ export class DataViewBlockComponent extends BlockComponent<DataViewBlockModel> {
     }
   );
 
-  private _viewSource?: ViewSource;
-  public get viewSource(): ViewSource {
-    if (!this._viewSource) {
-      this._viewSource = new BlockQueryViewSource(this.model);
-    }
-    return this._viewSource;
-  }
+  selection$ = computed(() => {
+    const databaseSelection = this.selection.value.find(
+      (selection): selection is DatabaseSelection => {
+        if (selection.blockId !== this.blockId) {
+          return false;
+        }
+        return selection instanceof DatabaseSelection;
+      }
+    );
+    return databaseSelection?.viewSelection;
+  });
 
   setSelection = (selection: DataViewSelection | undefined) => {
     this.selection.setGroup(
@@ -236,54 +194,86 @@ export class DataViewBlockComponent extends BlockComponent<DataViewBlockModel> {
         : []
     );
   };
-  selectionUpdated = new Slot<DataViewSelection | undefined>();
 
-  get getFlag() {
-    return this.host.doc.awarenessStore.getFlag.bind(
-      this.host.doc.awarenessStore
-    );
+  toolsWidget: DataViewWidget = widgetPresets.createTools({
+    table: [
+      widgetPresets.tools.filter,
+      widgetPresets.tools.expand,
+      widgetPresets.tools.search,
+      widgetPresets.tools.viewOptions,
+      widgetPresets.tools.tableAddRow,
+    ],
+    kanban: [
+      widgetPresets.tools.filter,
+      widgetPresets.tools.expand,
+      widgetPresets.tools.search,
+      widgetPresets.tools.viewOptions,
+    ],
+  });
+
+  private renderDatabaseOps() {
+    if (this.doc.readonly) {
+      return nothing;
+    }
+    return html` <div class="database-ops" @click="${this._clickDatabaseOps}">
+      ${MoreHorizontalIcon}
+    </div>`;
   }
 
-  _bindHotkey: DataViewProps['bindHotkey'] = hotkeys => {
-    return {
-      dispose: this.host.event.bindHotkey(hotkeys, {
-        path: this.topContenteditableElement?.path ?? this.path,
-      }),
-    };
-  };
-  _handleEvent: DataViewProps['handleEvent'] = (name, handler) => {
-    return {
-      dispose: this.host.event.add(name, handler, {
-        path: this.path,
-      }),
-    };
-  };
+  override connectedCallback() {
+    super.connectedCallback();
 
-  get innerModalWidget() {
-    return this.rootElement?.widgetElements[
-      AFFINE_INNER_MODAL_WIDGET
-    ] as AffineInnerModalWidget;
+    this.setAttribute(RangeManager.rangeSyncExcludeAttr, 'true');
   }
 
   override renderBlock() {
+    const peekViewService = this.getRootService().peekViewService;
     return html`
       <div contenteditable="false" style="position: relative">
         ${this.dataView.render({
           bindHotkey: this._bindHotkey,
           handleEvent: this._handleEvent,
-          getFlag: this.getFlag,
-          selectionUpdated: this.selectionUpdated,
+          selection$: this.selection$,
           setSelection: this.setSelection,
           dataSource: this.dataSource,
-          viewSource: this.viewSource,
           headerWidget: this.headerWidget,
           std: this.std,
           detailPanelConfig: {
+            openDetailPanel: peekViewService
+              ? (target, template) => peekViewService.peek(target, template)
+              : undefined,
             target: () => this.innerModalWidget.target,
           },
         })}
       </div>
     `;
+  }
+
+  get dataSource(): DataSource {
+    if (!this._dataSource) {
+      this._dataSource = new BlockQueryDataSource(this.host, this.model, {
+        type: 'todo',
+      });
+    }
+    return this._dataSource;
+  }
+
+  get innerModalWidget() {
+    return this.rootComponent?.widgetComponents[
+      AFFINE_INNER_MODAL_WIDGET
+    ] as AffineInnerModalWidget;
+  }
+
+  override get topContenteditableElement() {
+    if (this.rootComponent instanceof EdgelessRootBlockComponent) {
+      const note = this.closest<NoteBlockComponent>('affine-note');
+      return note;
+    }
+    return this.rootComponent;
+  }
+
+  get view() {
+    return this.dataView.expose;
   }
 }
 

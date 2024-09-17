@@ -1,17 +1,17 @@
-import '../../../utils/tags/multi-tag-select.js';
-import '../../../utils/tags/multi-tag-view.js';
-
 import { customElement } from 'lit/decorators.js';
 import { html } from 'lit/static-html.js';
 
+import type { SelectColumnData } from '../../types.js';
+
+import '../../../utils/tags/multi-tag-select.js';
 import {
-  popTagSelect,
   type SelectTag,
+  popTagSelect,
 } from '../../../utils/tags/multi-tag-select.js';
+import '../../../utils/tags/multi-tag-view.js';
 import { createIcon } from '../../../utils/uni-icon.js';
 import { BaseCellRenderer } from '../../base-cell.js';
 import { createFromBaseCellRenderer } from '../../renderer.js';
-import type { SelectColumnData } from '../../types.js';
 import { selectColumnModelConfig } from './define.js';
 
 @customElement('affine-database-select-cell')
@@ -21,7 +21,7 @@ export class SelectCell extends BaseCellRenderer<string[], SelectColumnData> {
     return html`
       <affine-multi-tag-view
         .value="${value}"
-        .options="${this.column.data.options}"
+        .options="${this.column.data$.value.options}"
       ></affine-multi-tag-view>
     `;
   }
@@ -32,22 +32,14 @@ export class SelectCellEditing extends BaseCellRenderer<
   string,
   SelectColumnData
 > {
-  get _options(): SelectTag[] {
-    return this.column.data.options;
-  }
-
-  get _value() {
-    const value = this.value;
-    return value ? [value] : [];
-  }
+  _editComplete = () => {
+    this.selectCurrentCell(false);
+  };
 
   _onChange = ([id]: string[]) => {
     this.onChange(id);
   };
 
-  _editComplete = () => {
-    this.selectCurrentCell(false);
-  };
   _onOptionsChange = (options: SelectTag[]) => {
     this.column.updateData(data => {
       return {
@@ -56,10 +48,6 @@ export class SelectCellEditing extends BaseCellRenderer<
       };
     });
   };
-
-  override firstUpdated() {
-    this.popTagSelect();
-  }
 
   private popTagSelect = () => {
     this._disposables.add({
@@ -77,6 +65,19 @@ export class SelectCellEditing extends BaseCellRenderer<
       ),
     });
   };
+
+  get _options(): SelectTag[] {
+    return this.column.data$.value.options;
+  }
+
+  get _value() {
+    const value = this.value;
+    return value ? [value] : [];
+  }
+
+  override firstUpdated() {
+    this.popTagSelect();
+  }
 
   override render() {
     return html`

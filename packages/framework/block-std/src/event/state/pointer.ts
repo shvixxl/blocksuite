@@ -11,29 +11,27 @@ type PointerEventStateOptions = {
 type Point = { x: number; y: number };
 
 export class PointerEventState extends UIEventState {
-  override type = 'pointerState';
+  button: number;
 
-  raw: PointerEvent;
-  point: Point;
   containerOffset: Point;
-  start: Point;
+
   delta: Point;
+
   keys: {
     shift: boolean;
     cmd: boolean;
     alt: boolean;
   };
-  button: number;
-  dragging: boolean;
+
+  point: Point;
+
   pressure: number;
 
-  get x() {
-    return this.point.x;
-  }
+  raw: PointerEvent;
 
-  get y() {
-    return this.point.y;
-  }
+  start: Point;
+
+  override type = 'pointerState';
 
   constructor({ event, rect, startX, startY, last }: PointerEventStateOptions) {
     super(event);
@@ -54,13 +52,32 @@ export class PointerEventState extends UIEventState {
       alt: event.altKey,
     };
     this.button = last?.button || event.button;
-    this.dragging = !!last;
     this.pressure = event.pressure;
+  }
+
+  get x() {
+    return this.point.x;
+  }
+
+  get y() {
+    return this.point.y;
+  }
+}
+
+export class MultiPointerEventState extends UIEventState {
+  pointers: PointerEventState[];
+
+  override type = 'multiPointerState';
+
+  constructor(event: PointerEvent, pointers: PointerEventState[]) {
+    super(event);
+    this.pointers = pointers;
   }
 }
 
 declare global {
   interface BlockSuiteUIEventState {
     pointerState: PointerEventState;
+    multiPointerState: MultiPointerEventState;
   }
 }

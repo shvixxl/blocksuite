@@ -1,18 +1,23 @@
 import type { PointerEventState } from '@blocksuite/block-std';
-import { assertExists, noop } from '@blocksuite/global/utils';
+import type { IVec } from '@blocksuite/global/utils';
+
+import { Bound } from '@blocksuite/global/utils';
+import { noop } from '@blocksuite/global/utils';
 
 import type {
-  EdgelessTool,
-  ShapeTool,
-} from '../../../../_common/utils/index.js';
-import { hasClassNameInList } from '../../../../_common/utils/index.js';
-import type { ShapeElementModel } from '../../../../surface-block/index.js';
-import {
-  Bound,
-  CanvasElementType,
-  type IVec,
+  ShapeElementModel,
+  ShapeType,
 } from '../../../../surface-block/index.js';
 import type { SelectionArea } from '../../services/tools-manager.js';
+import type { EdgelessTool } from '../../types.js';
+
+import { ThemeObserver } from '../../../../_common/theme/theme-observer.js';
+import { hasClassNameInList } from '../../../../_common/utils/index.js';
+import {
+  DEFAULT_SHAPE_FILL_COLOR,
+  DEFAULT_SHAPE_STROKE_COLOR,
+} from '../../../../surface-block/elements/shape/consts.js';
+import { CanvasElementType } from '../../../../surface-block/index.js';
 import {
   EXCLUDING_MOUSE_OUT_CLASS_LIST,
   SHAPE_OVERLAY_HEIGHT,
@@ -20,25 +25,34 @@ import {
   SHAPE_OVERLAY_WIDTH,
 } from '../../utils/consts.js';
 import { ShapeOverlay } from '../../utils/tool-overlay.js';
-import { EdgelessToolController } from './index.js';
+import { EdgelessToolController } from './edgeless-tool.js';
+
+export type ShapeTool = {
+  type: 'shape';
+  shapeType: ShapeType | 'roundedRect';
+};
 
 export class ShapeToolController extends EdgelessToolController<ShapeTool> {
-  readonly tool = <ShapeTool>{
-    type: 'shape',
-    shapeType: 'rect',
-  };
+  private _disableOverlay = false;
+
+  protected override _draggingArea: SelectionArea | null = null;
 
   private _draggingElement: ShapeElementModel | null = null;
+
   private _draggingElementId: string | null = null;
+
+  private _moveWithSpaceShapePosTemp: SelectionArea | null = null;
+
+  // For moving selection with space with mouse
+  private _moveWithSpaceStartPos: IVec = [0, 0];
 
   // shape overlay
   private _shapeOverlay: ShapeOverlay | null = null;
 
-  protected override _draggingArea: SelectionArea | null = null;
-
-  // For moving selection with space with mouse
-  private _moveWithSpaceStartPos: IVec = [0, 0];
-  private _moveWithSpaceShapePosTemp: SelectionArea | null = null;
+  readonly tool = {
+    type: 'shape',
+    shapeType: 'rect',
+  } as ShapeTool;
 
   private _addNewShape(
     e: PointerEventState,
@@ -62,137 +76,25 @@ export class ShapeToolController extends EdgelessToolController<ShapeTool> {
       radius: attributes.radius,
     });
 
+    this._service.telemetryService?.track('CanvasElementAdded', {
+      control: 'canvas:draw',
+      page: 'whiteboard editor',
+      module: 'toolbar',
+      segment: 'toolbar',
+      type: CanvasElementType.SHAPE,
+      other: {
+        shapeType,
+      },
+    });
+
     return id;
   }
 
-  onContainerClick(e: PointerEventState): void {
-    this.clearOverlay();
+  private _hideOverlay() {
+    if (!this._shapeOverlay) return;
 
-    this._doc.captureSync();
-
-    const id = this._addNewShape(e, SHAPE_OVERLAY_WIDTH, SHAPE_OVERLAY_HEIGHT);
-
-    const element = this._service.getElementById(id);
-    assertExists(element);
-
-    this._edgeless.tools.switchToDefaultMode({
-      elements: [element.id],
-      editing: false,
-    });
-  }
-
-  onContainerContextMenu(): void {
-    noop();
-  }
-
-  onContainerPointerDown(): void {
-    noop();
-  }
-
-  onContainerDblClick(): void {
-    noop();
-  }
-
-  onContainerTripleClick() {
-    noop();
-  }
-
-  onContainerDragStart(e: PointerEventState) {
-    this.clearOverlay();
-
-    this._doc.captureSync();
-
-    const id = this._addNewShape(e, 0, 0);
-
-    this._draggingElementId = id;
-    this._draggingElement = this._service.getElementById(
-      id
-    ) as ShapeElementModel;
-    this._draggingElement.stash('xywh');
-    this._draggingArea = {
-      start: new DOMPoint(e.x, e.y),
-      end: new DOMPoint(e.x, e.y),
-    };
-  }
-
-  onContainerDragMove(e: PointerEventState) {
-    assertExists(this._draggingElementId);
-    assertExists(this._draggingArea);
-
-    this._draggingArea.end = new DOMPoint(e.x, e.y);
-
-    if (this._edgeless.tools.spaceBar) {
-      this._move();
-    }
-
-    this._resize(e.keys.shift || this._edgeless.tools.shiftKey);
-  }
-
-  onContainerDragEnd() {
-    if (this._draggingElement) {
-      const draggingElement = this._draggingElement;
-
-      draggingElement.pop('xywh');
-    }
-
-    const id = this._draggingElementId;
-    assertExists(id);
-
-    if (this._draggingArea) {
-      const width = Math.abs(
-        this._draggingArea?.end.x - this._draggingArea?.start.x
-      );
-      const height = Math.abs(
-        this._draggingArea?.end.y - this._draggingArea?.start.y
-      );
-      if (width < 20 && height < 20) {
-        this._service.removeElement(id);
-        return;
-      }
-    }
-
-    this._draggingElement = null;
-    this._draggingElementId = null;
-    this._draggingArea = null;
-
-    this._doc.captureSync();
-
-    const element = this._service.getElementById(id);
-    assertExists(element);
-
-    this._edgeless.tools.switchToDefaultMode({
-      elements: [element.id],
-      editing: false,
-    });
-  }
-
-  onPressShiftKey(pressed: boolean) {
-    const id = this._draggingElementId;
-    if (!id) return;
-    this._resize(pressed);
-  }
-
-  onPressSpaceBar(pressed: boolean): void {
-    const { tools } = this._edgeless;
-    assertExists(this._draggingArea);
-    if (tools.dragging) {
-      if (pressed) {
-        const x = this._draggingArea.end.x;
-        const y = this._draggingArea.end.y;
-        this._moveWithSpaceStartPos = [x, y];
-
-        // Keep a temp version of the _draggingArea
-        const {
-          start: { x: startX, y: startY },
-          end: { x: endX, y: endY },
-        } = this._draggingArea;
-
-        this._moveWithSpaceShapePosTemp = {
-          start: new DOMPoint(startX, startY),
-          end: new DOMPoint(endX, endY),
-        };
-      }
-    }
+    this._shapeOverlay.globalAlpha = 0;
+    this._edgeless.surface.refresh();
   }
 
   private _move() {
@@ -201,8 +103,8 @@ export class ShapeToolController extends EdgelessToolController<ShapeTool> {
       _moveWithSpaceStartPos,
       _moveWithSpaceShapePosTemp,
     } = this;
-    assertExists(_draggingArea);
-    assertExists(_moveWithSpaceShapePosTemp);
+    if (!_draggingArea) return;
+    if (!_moveWithSpaceShapePosTemp) return;
 
     const { x: moveCurX, y: moveCurY } = _draggingArea.end;
 
@@ -218,8 +120,8 @@ export class ShapeToolController extends EdgelessToolController<ShapeTool> {
 
   private _resize(shift = false) {
     const { _draggingElementId: id, _draggingArea } = this;
-    assertExists(id);
-    assertExists(_draggingArea);
+    if (!id) return;
+    if (!_draggingArea) return;
 
     const { viewport } = this._service;
     const { zoom } = viewport;
@@ -258,6 +160,15 @@ export class ShapeToolController extends EdgelessToolController<ShapeTool> {
     this._edgeless.surface.refresh();
   }
 
+  afterModeSwitch(newTool: EdgelessTool) {
+    if (newTool.type !== 'shape') return;
+    this.createOverlay();
+  }
+
+  beforeModeSwitch() {
+    this.clearOverlay();
+  }
+
   clearOverlay() {
     if (!this._shapeOverlay) return;
 
@@ -267,11 +178,141 @@ export class ShapeToolController extends EdgelessToolController<ShapeTool> {
     this._edgeless.surface.refresh();
   }
 
-  private _hideOverlay() {
-    if (!this._shapeOverlay) return;
+  createOverlay() {
+    this.clearOverlay();
+    if (this._disableOverlay) return;
+    const options = SHAPE_OVERLAY_OPTIONS;
+    const attributes =
+      this._edgeless.service.editPropsStore.getLastProps('shape');
+    options.stroke = ThemeObserver.getColorValue(
+      attributes.strokeColor,
+      DEFAULT_SHAPE_STROKE_COLOR,
+      true
+    );
+    options.fill = ThemeObserver.getColorValue(
+      attributes.fillColor,
+      DEFAULT_SHAPE_FILL_COLOR,
+      true
+    );
 
-    this._shapeOverlay.globalAlpha = 0;
-    this._edgeless.surface.refresh();
+    switch (attributes.strokeStyle!) {
+      case 'dash':
+        options.strokeLineDash = [12, 12];
+        break;
+      case 'none':
+        options.strokeLineDash = [];
+        options.stroke = 'transparent';
+        break;
+      default:
+        options.strokeLineDash = [];
+    }
+    let shapeType: string = attributes.shapeType;
+    if (attributes.radius > 0 && shapeType === 'rect') {
+      shapeType = 'roundedRect';
+    }
+    this._shapeOverlay = new ShapeOverlay(this._edgeless, shapeType, options, {
+      shapeStyle: attributes.shapeStyle,
+      fillColor: attributes.fillColor,
+      strokeColor: attributes.strokeColor,
+    });
+    this._edgeless.surface.renderer.addOverlay(this._shapeOverlay);
+  }
+
+  onContainerClick(e: PointerEventState): void {
+    this.clearOverlay();
+    if (this._disableOverlay) return;
+
+    this._doc.captureSync();
+
+    const id = this._addNewShape(e, SHAPE_OVERLAY_WIDTH, SHAPE_OVERLAY_HEIGHT);
+
+    const element = this._service.getElementById(id);
+    if (!element) return;
+
+    this._edgeless.tools.switchToDefaultMode({
+      elements: [element.id],
+      editing: false,
+    });
+  }
+
+  onContainerContextMenu(): void {
+    noop();
+  }
+
+  onContainerDblClick(): void {
+    noop();
+  }
+
+  onContainerDragEnd() {
+    if (this._disableOverlay) return;
+    if (this._draggingElement) {
+      const draggingElement = this._draggingElement;
+
+      draggingElement.pop('xywh');
+    }
+
+    const id = this._draggingElementId;
+    if (!id) return;
+
+    if (this._draggingArea) {
+      const width = Math.abs(
+        this._draggingArea?.end.x - this._draggingArea?.start.x
+      );
+      const height = Math.abs(
+        this._draggingArea?.end.y - this._draggingArea?.start.y
+      );
+      if (width < 20 && height < 20) {
+        this._service.removeElement(id);
+        return;
+      }
+    }
+
+    this._draggingElement = null;
+    this._draggingElementId = null;
+    this._draggingArea = null;
+
+    this._doc.captureSync();
+
+    const element = this._service.getElementById(id);
+    if (!element) return;
+
+    this._edgeless.tools.switchToDefaultMode({
+      elements: [element.id],
+      editing: false,
+    });
+  }
+
+  onContainerDragMove(e: PointerEventState) {
+    if (this._disableOverlay) return;
+    if (!this._draggingElementId) return;
+    if (!this._draggingArea) return;
+
+    this._draggingArea.end = new DOMPoint(e.x, e.y);
+
+    if (this._edgeless.tools.spaceBar) {
+      this._move();
+    }
+
+    this._resize(e.keys.shift || this._edgeless.tools.shiftKey);
+  }
+
+  onContainerDragStart(e: PointerEventState) {
+    if (this._disableOverlay) return;
+    this.clearOverlay();
+
+    this._doc.captureSync();
+
+    const id = this._addNewShape(e, 0, 0);
+
+    this._draggingElementId = id;
+    this._draggingElement = this._service.getElementById(
+      id
+    ) as ShapeElementModel;
+    this._draggingElement.stash('xywh');
+    this._draggingArea = {
+      start: new DOMPoint(e.x, e.y),
+      end: new DOMPoint(e.x, e.y),
+    };
   }
 
   onContainerMouseMove(e: PointerEventState) {
@@ -295,43 +336,51 @@ export class ShapeToolController extends EdgelessToolController<ShapeTool> {
     this._hideOverlay();
   }
 
-  beforeModeSwitch() {
-    this.clearOverlay();
+  onContainerPointerDown(): void {
+    noop();
   }
 
-  afterModeSwitch(newTool: EdgelessTool) {
-    if (newTool.type !== 'shape') return;
-    this.createOverlay();
+  onContainerTripleClick() {
+    noop();
   }
 
-  createOverlay() {
-    this.clearOverlay();
-    const options = SHAPE_OVERLAY_OPTIONS;
-    const attributes =
-      this._edgeless.service.editPropsStore.getLastProps('shape');
-    options.stroke = attributes.strokeColor;
-    options.fill = attributes.fillColor;
+  onPressShiftKey(pressed: boolean) {
+    const id = this._draggingElementId;
+    if (!id) return;
+    this._resize(pressed);
+  }
 
-    switch (attributes.strokeStyle!) {
-      case 'dash':
-        options.strokeLineDash = [12, 12];
-        break;
-      case 'none':
-        options.strokeLineDash = [];
-        options.stroke = 'transparent';
-        break;
-      default:
-        options.strokeLineDash = [];
+  onPressSpaceBar(pressed: boolean): void {
+    const { tools } = this._edgeless;
+    if (tools.dragging && pressed) {
+      if (!this._draggingArea) return;
+
+      const x = this._draggingArea.end.x;
+      const y = this._draggingArea.end.y;
+      this._moveWithSpaceStartPos = [x, y];
+
+      // Keep a temp version of the _draggingArea
+      const {
+        start: { x: startX, y: startY },
+        end: { x: endX, y: endY },
+      } = this._draggingArea;
+
+      this._moveWithSpaceShapePosTemp = {
+        start: new DOMPoint(startX, startY),
+        end: new DOMPoint(endX, endY),
+      };
     }
-    let shapeType: string = attributes.shapeType;
-    if (attributes.radius > 0 && shapeType === 'rect') {
-      shapeType = 'roundedRect';
+  }
+
+  setDisableOverlay(disable: boolean) {
+    this._disableOverlay = disable;
+  }
+}
+
+declare global {
+  namespace BlockSuite {
+    interface EdgelessToolMap {
+      shape: ShapeToolController;
     }
-    this._shapeOverlay = new ShapeOverlay(this._edgeless, shapeType, options, {
-      shapeStyle: attributes.shapeStyle,
-      fillColor: options.fill,
-      strokeColor: options.stroke,
-    });
-    this._edgeless.surface.renderer.addOverlay(this._shapeOverlay);
   }
 }

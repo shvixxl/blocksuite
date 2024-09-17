@@ -1,11 +1,11 @@
 import { WithDisposable } from '@blocksuite/block-std';
 import { baseTheme } from '@toeverything/theme';
 import {
+  LitElement,
+  type PropertyValues,
   css,
   html,
-  LitElement,
   nothing,
-  type PropertyValues,
   unsafeCSS,
 } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
@@ -14,7 +14,7 @@ import {
   DarkLoadingIcon,
   LightLoadingIcon,
 } from '../../../../_common/icons/text.js';
-import { getThemeMode } from '../../../../_common/utils/query.js';
+import { ThemeObserver } from '../../../../_common/theme/theme-observer.js';
 
 @customElement('generating-placeholder')
 class GeneratingPlaceholder extends WithDisposable(LitElement) {
@@ -90,29 +90,8 @@ class GeneratingPlaceholder extends WithDisposable(LitElement) {
     }
   `;
 
-  @property({ attribute: false })
-  accessor height: number = 300;
-
-  @property({ attribute: false })
-  accessor loadingProgress!: number;
-
-  @property({ attribute: false })
-  accessor stages!: string[];
-
-  @property({ attribute: false })
-  accessor showHeader!: boolean;
-
-  override willUpdate(changed: PropertyValues) {
-    if (changed.has('loadingProgress')) {
-      this.loadingProgress = Math.max(
-        1,
-        Math.min(this.loadingProgress, this.stages.length)
-      );
-    }
-  }
-
   protected override render() {
-    const theme = getThemeMode();
+    const theme = ThemeObserver.mode;
     const loadingText = this.stages[this.loadingProgress - 1] || '';
 
     return html`<style>
@@ -135,6 +114,27 @@ class GeneratingPlaceholder extends WithDisposable(LitElement) {
         </div>
       </div>`;
   }
+
+  override willUpdate(changed: PropertyValues) {
+    if (changed.has('loadingProgress')) {
+      this.loadingProgress = Math.max(
+        1,
+        Math.min(this.loadingProgress, this.stages.length)
+      );
+    }
+  }
+
+  @property({ attribute: false })
+  accessor height: number = 300;
+
+  @property({ attribute: false })
+  accessor loadingProgress!: number;
+
+  @property({ attribute: false })
+  accessor showHeader!: boolean;
+
+  @property({ attribute: false })
+  accessor stages!: string[];
 }
 
 declare global {

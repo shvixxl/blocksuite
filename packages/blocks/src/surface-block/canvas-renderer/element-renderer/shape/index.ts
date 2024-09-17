@@ -1,34 +1,43 @@
-import type { IBound } from '../../../consts.js';
+import type { IBound } from '@blocksuite/global/utils';
+
+import { Bound } from '@blocksuite/global/utils';
+
 import type {
   ShapeElementModel,
   ShapeType,
 } from '../../../element-model/shape.js';
-import { Bound } from '../../../utils/bound.js';
+import type { RoughCanvas } from '../../../rough/canvas.js';
 import type { Renderer } from '../../renderer.js';
+
+import { TextAlign } from '../../../consts.js';
+import {
+  DEFAULT_SHAPE_FILL_COLOR,
+  DEFAULT_SHAPE_STROKE_COLOR,
+  DEFAULT_SHAPE_TEXT_COLOR,
+} from '../../../elements/shape/consts.js';
 import {
   deltaInsertsToChunks,
+  getFontMetrics,
   getFontString,
-  getLineHeight,
   getLineWidth,
   isRTL,
+  measureTextInDOM,
   wrapTextDeltas,
 } from '../text/utils.js';
 import { diamond } from './diamond.js';
 import { ellipse } from './ellipse.js';
 import { rect } from './rect.js';
 import { triangle } from './triangle.js';
-import {
-  horizontalOffset,
-  SHAPE_TEXT_PADDING,
-  verticalOffset,
-} from './utils.js';
+import { type Colors, horizontalOffset, verticalOffset } from './utils.js';
 
 const shapeRenderers: {
   [key in ShapeType]: (
     model: ShapeElementModel,
     ctx: CanvasRenderingContext2D,
     matrix: DOMMatrix,
-    renderer: Renderer
+    renderer: Renderer,
+    rc: RoughCanvas,
+    colors: Colors
   ) => void;
 } = {
   diamond,
@@ -41,52 +50,84 @@ export function shape(
   model: ShapeElementModel,
   ctx: CanvasRenderingContext2D,
   matrix: DOMMatrix,
-  renderer: Renderer
+  renderer: Renderer,
+  rc: RoughCanvas
 ) {
-  shapeRenderers[model.shapeType](model, ctx, matrix, renderer);
+  const color = renderer.getColorValue(
+    model.color,
+    DEFAULT_SHAPE_TEXT_COLOR,
+    true
+  );
+  const fillColor = renderer.getColorValue(
+    model.fillColor,
+    DEFAULT_SHAPE_FILL_COLOR,
+    true
+  );
+  const strokeColor = renderer.getColorValue(
+    model.strokeColor,
+    DEFAULT_SHAPE_STROKE_COLOR,
+    true
+  );
+  const colors = { color, fillColor, strokeColor };
+
+  shapeRenderers[model.shapeType](model, ctx, matrix, renderer, rc, colors);
 
   if (model.textDisplay) {
-    renderText(model, ctx, renderer);
+    renderText(model, ctx, colors);
   }
 }
 
 function renderText(
   model: ShapeElementModel,
   ctx: CanvasRenderingContext2D,
-  renderer: Renderer
+  { color }: Colors
 ) {
   const {
     x,
     y,
     text,
-    color,
     fontSize,
     fontFamily,
+    fontWeight,
     textAlign,
     w,
     h,
     textVerticalAlign,
+    padding,
   } = model;
   if (!text) return;
 
-  const lineHeight = getLineHeight(fontFamily, fontSize);
-  const font = getFontString({
-    fontSize,
+  const [verticalPadding, horPadding] = padding;
+  const font = getFontString(model);
+  const { lineGap, lineHeight } = measureTextInDOM(
     fontFamily,
-    fontWeight: model.fontWeight,
-    fontStyle: model.fontStyle,
-  });
-  const lines = deltaInsertsToChunks(
-    wrapTextDeltas(text, font, w - SHAPE_TEXT_PADDING * 2)
+    fontSize,
+    fontWeight
   );
-  const horiOffset = horizontalOffset(model.w, model.textAlign);
-  const vertOffset = verticalOffset(lines, lineHeight, h, textVerticalAlign);
+  const metrics = getFontMetrics(fontFamily, fontSize, fontWeight);
+  const lines = deltaInsertsToChunks(
+    wrapTextDeltas(text, font, w - horPadding * 2)
+  );
+  const horOffset = horizontalOffset(model.w, model.textAlign, horPadding);
+  const vertOffset =
+    verticalOffset(
+      lines,
+      lineHeight + lineGap,
+      h,
+      textVerticalAlign,
+      verticalPadding
+    ) +
+    metrics.fontBoundingBoxAscent +
+    lineGap / 2;
   let maxLineWidth = 0;
+
+  ctx.font = font;
+  ctx.fillStyle = color;
+  ctx.textAlign = textAlign;
+  ctx.textBaseline = 'alphabetic';
 
   for (const [lineIndex, line] of lines.entries()) {
     for (const delta of line) {
-      ctx.save();
-
       const str = delta.insert;
       const rtl = isRTL(str);
       const shouldTemporarilyAttach = rtl && !ctx.canvas.isConnected;
@@ -95,18 +136,16 @@ function renderText(
         // to the DOM
         document.body.append(ctx.canvas);
       }
-      ctx.canvas.setAttribute('dir', rtl ? 'rtl' : 'ltr');
-      ctx.font = font;
-      ctx.fillStyle = renderer.getVariableColor(color);
-      ctx.textAlign = textAlign;
 
-      ctx.textBaseline = 'ideographic';
+      if (ctx.canvas.dir !== (rtl ? 'rtl' : 'ltr')) {
+        ctx.canvas.setAttribute('dir', rtl ? 'rtl' : 'ltr');
+      }
 
       ctx.fillText(
         str,
-        // 1.5 is the magic number to make the text align with the DOM text
-        horiOffset - 1.5,
-        (lineIndex + 1) * lineHeight + vertOffset - 1.5
+        // 0.5 is the dom editor padding to make the text align with the DOM text
+        horOffset + 0.5,
+        lineIndex * lineHeight + vertOffset
       );
 
       maxLineWidth = Math.max(maxLineWidth, getLineWidth(str, font));
@@ -114,14 +153,20 @@ function renderText(
       if (shouldTemporarilyAttach) {
         ctx.canvas.remove();
       }
-
-      ctx.restore();
     }
   }
 
+  const offsetX =
+    model.textAlign === TextAlign.Center
+      ? (w - maxLineWidth) / 2
+      : model.textAlign === TextAlign.Left
+        ? horOffset
+        : horOffset - maxLineWidth;
+  const offsetY = vertOffset - lineHeight + verticalPadding / 2;
+
   const bound = new Bound(
-    x + (w - maxLineWidth) / 2,
-    y + vertOffset - 2,
+    x + offsetX,
+    y + offsetY,
     maxLineWidth,
     lineHeight * lines.length
   ) as IBound;

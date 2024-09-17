@@ -1,15 +1,12 @@
 import { ShadowlessElement, WithDisposable } from '@blocksuite/block-std';
-import type { ReferenceElement } from '@floating-ui/dom';
 import { css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import {
-  eventToVRect,
-  popFilterableSimpleMenu,
-} from '../../../../_common/components/index.js';
+import type { Filter, Variable, VariableOrProperty } from '../ast.js';
+
+import { popFilterableSimpleMenu } from '../../../../_common/components/index.js';
 import { AddCursorIcon } from '../../../../_common/icons/index.js';
 import { renderUniLit } from '../../utils/uni-component/uni-component.js';
-import type { Filter, Variable, VariableOrProperty } from '../ast.js';
 import { firstFilterByRef, firstFilterInGroup } from '../ast.js';
 
 @customElement('variable-ref-view')
@@ -37,20 +34,12 @@ export class VariableRefView extends WithDisposable(ShadowlessElement) {
       color: var(--affine-icon-color);
     }
   `;
-  @property({ attribute: false })
-  accessor data: VariableOrProperty | undefined = undefined;
-
-  @property({ attribute: false })
-  accessor setData!: (filter: VariableOrProperty) => void;
-
-  @property({ attribute: false })
-  accessor vars!: Variable[];
 
   override connectedCallback() {
     super.connectedCallback();
     this.disposables.addFromEvent(this, 'click', e => {
       popFilterableSimpleMenu(
-        eventToVRect(e),
+        e.target as HTMLElement,
         this.vars.map(v => ({
           type: 'action',
           name: v.name,
@@ -64,6 +53,11 @@ export class VariableRefView extends WithDisposable(ShadowlessElement) {
         }))
       );
     });
+  }
+
+  override render() {
+    const data = this.fieldData;
+    return html` ${renderUniLit(data?.icon, {})} ${data?.name} `;
   }
 
   get field() {
@@ -94,10 +88,14 @@ export class VariableRefView extends WithDisposable(ShadowlessElement) {
     return this.data.propertyFuncName;
   }
 
-  override render() {
-    const data = this.fieldData;
-    return html` ${renderUniLit(data?.icon, {})} ${data?.name} `;
-  }
+  @property({ attribute: false })
+  accessor data: VariableOrProperty | undefined = undefined;
+
+  @property({ attribute: false })
+  accessor setData!: (filter: VariableOrProperty) => void;
+
+  @property({ attribute: false })
+  accessor vars!: Variable[];
 }
 
 declare global {
@@ -106,7 +104,7 @@ declare global {
   }
 }
 export const popCreateFilter = (
-  target: ReferenceElement,
+  target: HTMLElement,
   props: {
     vars: Variable[];
     onSelect: (filter: Filter) => void;

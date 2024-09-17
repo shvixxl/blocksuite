@@ -1,7 +1,8 @@
 import type { Op, OpSet, ResolvedOptions } from '../core.js';
 import type { Line, Point } from '../geometry.js';
-import { lineLength } from '../geometry.js';
 import type { PatternFiller, RenderHelper } from './filler-interface.js';
+
+import { lineLength } from '../geometry.js';
 import { polygonHachureLines } from './scan-line-hachure.js';
 
 export class ZigZagLineFiller implements PatternFiller {
@@ -9,14 +10,6 @@ export class ZigZagLineFiller implements PatternFiller {
 
   constructor(helper: RenderHelper) {
     this.helper = helper;
-  }
-
-  fillPolygons(polygonList: Point[][], o: ResolvedOptions): OpSet {
-    const gap = o.hachureGap < 0 ? o.strokeWidth * 4 : o.hachureGap;
-    const zo = o.zigzagOffset < 0 ? gap : o.zigzagOffset;
-    o = Object.assign({}, o, { hachureGap: gap + zo });
-    const lines = polygonHachureLines(polygonList, o);
-    return { type: 'fillSketch', ops: this.zigzagLines(lines, zo, o) };
   }
 
   private zigzagLines(lines: Line[], zo: number, o: ResolvedOptions): Op[] {
@@ -60,5 +53,13 @@ export class ZigZagLineFiller implements PatternFiller {
       }
     });
     return ops;
+  }
+
+  fillPolygons(polygonList: Point[][], o: ResolvedOptions): OpSet {
+    const gap = o.hachureGap < 0 ? o.strokeWidth * 4 : o.hachureGap;
+    const zo = o.zigzagOffset < 0 ? gap : o.zigzagOffset;
+    o = Object.assign({}, o, { hachureGap: gap + zo });
+    const lines = polygonHachureLines(polygonList, o);
+    return { type: 'fillSketch', ops: this.zigzagLines(lines, zo, o) };
   }
 }

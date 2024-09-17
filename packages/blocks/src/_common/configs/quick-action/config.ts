@@ -1,10 +1,8 @@
-import './database-convert-view.js';
-
 import type { EditorHost } from '@blocksuite/block-std';
-import { assertExists } from '@blocksuite/global/utils';
-import { html, type TemplateResult } from 'lit';
 
-// NOTE: disabled for bundle
+import { assertExists } from '@blocksuite/global/utils';
+import { type TemplateResult, html } from 'lit';
+
 import { matchFlavours } from '../../../_common/utils/model.js';
 import { createSimplePortal } from '../../components/portal.js';
 import { toast } from '../../components/toast.js';
@@ -12,10 +10,16 @@ import {
   CopyIcon,
   DatabaseTableViewIcon20,
   // NOTE: disabled for bundle
-  // FontLinkedDocIcon,
+  // LinkedDocIcon,
 } from '../../icons/index.js';
 // NOTE: disabled for bundle
-// import { convertSelectedBlocksToLinkedDoc } from '../../utils/render-linked-doc.js';
+// import {
+//   convertSelectedBlocksToLinkedDoc,
+//   getTitleFromSelectedModels,
+//   notifyDocCreated,
+//   promptDocTitle,
+// } from '../../utils/render-linked-doc.js';
+import './database-convert-view.js';
 import { DATABASE_CONVERT_WHITE_LIST } from './database-convert-view.js';
 
 export interface QuickActionConfig {
@@ -47,6 +51,7 @@ export const quickActionConfig: QuickActionConfig[] = [
             toast(host, 'Copied to clipboard');
           },
         })
+        .draftSelectedModels()
         .copySelectedModels()
         .run();
     },
@@ -101,7 +106,7 @@ export const quickActionConfig: QuickActionConfig[] = [
   // {
   //   id: 'convert-to-linked-doc',
   //   name: 'Create Linked Doc',
-  //   icon: FontLinkedDocIcon,
+  //   icon: LinkedDocIcon,
   //   hotkey: `Mod-Shift-l`,
   //   showWhen: host => {
   //     const [_, ctx] = host.std.command
@@ -135,12 +140,23 @@ export const quickActionConfig: QuickActionConfig[] = [
   //     assertExists(selectedModels);
   //     if (!selectedModels.length) return;
 
-  //     host.selection.clear();
+  // //     host.selection.clear();
 
   //     const doc = host.doc;
-  //     const linkedDoc = convertSelectedBlocksToLinkedDoc(doc, selectedModels);
-  //     const linkedDocService = host.spec.getService('affine:embed-linked-doc');
-  //     linkedDocService.slots.linkedDocCreated.emit({ docId: linkedDoc.id });
+  //     const autofill = getTitleFromSelectedModels(selectedModels);
+  //     void promptDocTitle(host, autofill).then(title => {
+  //       if (title === null) return;
+  //       const linkedDoc = convertSelectedBlocksToLinkedDoc(
+  //         doc,
+  //         selectedModels,
+  //         title
+  //       );
+  //       const linkedDocService = host.spec.getService(
+  //         'affine:embed-linked-doc'
+  //       );
+  //       linkedDocService.slots.linkedDocCreated.emit({ docId: linkedDoc.id });
+  //       notifyDocCreated(host, doc);
+  //     });
   //   },
   // },
 ];

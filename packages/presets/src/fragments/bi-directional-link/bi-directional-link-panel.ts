@@ -1,18 +1,19 @@
-import { WithDisposable } from '@blocksuite/block-std';
 import type {
   AffineReference,
   PageRootBlockComponent,
 } from '@blocksuite/blocks';
+import type { DeltaInsert } from '@blocksuite/inline';
+import type { BlockModel, Doc } from '@blocksuite/store';
+
+import { WithDisposable } from '@blocksuite/block-std';
 import {
   type AffineTextAttributes,
-  getAffineInlineSpecsWithReference,
   ReferenceNodeConfig,
+  getAffineInlineSpecsWithReference,
 } from '@blocksuite/blocks';
 import { BlocksUtils, InlineManager, RichText } from '@blocksuite/blocks';
 import { assertExists, noop } from '@blocksuite/global/utils';
-import type { DeltaInsert } from '@blocksuite/inline';
-import type { BlockModel, Doc } from '@blocksuite/store';
-import { css, html, LitElement, nothing, type TemplateResult } from 'lit';
+import { LitElement, type TemplateResult, css, html, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { styleMap } from 'lit/directives/style-map.js';
@@ -20,6 +21,7 @@ import { styleMap } from 'lit/directives/style-map.js';
 import {
   ArrowJumpIcon,
   ArrowLeftIcon,
+  SmallDeleteIcon,
   SmallLinkedDocIcon,
 } from '../_common/icons.js';
 import { DOC_BLOCK_CHILD_PADDING } from '../doc-meta-tags/utils.js';
@@ -30,6 +32,8 @@ const { matchFlavours } = BlocksUtils;
 
 @customElement('bi-directional-link-panel')
 export class BiDirectionalLinkPanel extends WithDisposable(LitElement) {
+  private _inlineManager = new InlineManager();
+
   static override styles = css`
     :host {
       width: 100%;
@@ -127,6 +131,12 @@ export class BiDirectionalLinkPanel extends WithDisposable(LitElement) {
       border-bottom: 0.5px solid var(--affine-divider-color);
     }
 
+    .link.deleted {
+      color: var(--affine-text-disable-color);
+      text-decoration: line-through;
+      fill: var(--affine-text-disable-color);
+    }
+
     .arrow {
       cursor: pointer;
       transition: transform 0.2s;
@@ -201,130 +211,11 @@ export class BiDirectionalLinkPanel extends WithDisposable(LitElement) {
     }
   `;
 
-  @state()
-  private accessor _show = false;
-
-  @state()
-  private accessor _backLinkShow: boolean[] = [];
-
-  @property({ attribute: false })
-  accessor doc!: Doc;
-
-  @property({ attribute: false })
-  accessor pageRoot!: PageRootBlockComponent;
-
-  private _inlineManager = new InlineManager();
-
-  override connectedCallback(): void {
-    super.connectedCallback();
-    const config = new ReferenceNodeConfig();
-    config.setInteractable(false);
-    config.setDoc(this.doc);
-    config.setCustomContent((reference: AffineReference) => {
-      const title = reference.doc.meta?.title
-        ? reference.doc.meta.title
-        : 'Untitled';
-      return html`<style>
-          .custom-reference-content svg {
-            position: relative;
-            top: 2px;
-          }
-        </style>
-        <span class="custom-reference-content">
-          ${SmallLinkedDocIcon} ${title}
-        </span> `;
-    });
-    this._inlineManager.registerSpecs(
-      getAffineInlineSpecsWithReference(config)
-    );
-    const { _disposables } = this;
-    _disposables.add(
-      this.doc.collection.indexer.backlink.slots.indexUpdated.on(() => {
-        this.requestUpdate();
-      })
-    );
-
-    this._show =
-      !!this._rootService.editPropsStore.getItem('showBidirectional');
-  }
-
-  private _toggleShow() {
-    this._show = !this._show;
-    this._rootService.editPropsStore.setItem('showBidirectional', this._show);
-  }
-
-  private get _host() {
-    return this.pageRoot.host;
-  }
-
-  private get _links() {
-    const { doc } = this;
-
-    const ids = new Set<string>();
-    doc
-      .getBlockByFlavour([
-        'affine:paragraph',
-        'affine:list',
-        'affine:embed-linked-doc',
-        'affine:embed-synced-doc',
-      ])
-      .forEach(model => {
-        if (model.text) {
-          const deltas: DeltaInsert<AffineTextAttributes>[] =
-            model.text.yText.toDelta();
-
-          deltas.forEach(delta => {
-            if (delta.attributes?.reference?.pageId)
-              ids.add(delta.attributes.reference.pageId);
-          });
-        } else if (
-          matchFlavours(model, [
-            'affine:embed-linked-doc',
-            'affine:embed-synced-doc',
-          ])
-        ) {
-          ids.add(model.pageId);
-        }
-      });
-
-    return Array.from(ids);
-  }
-
-  private get _rootService() {
-    return this._host.spec.getService('affine:page');
-  }
-
-  private _renderLinks(ids: string[]) {
-    const { collection } = this.doc;
-
-    return html`<div class="links">
-      <div class="links-title">Outgoing links · ${ids.length}</div>
-      ${repeat(
-        ids,
-        id => id,
-        id => {
-          const doc = collection.getDoc(id);
-          assertExists(doc);
-          const title = doc.meta?.title ? doc.meta.title : 'Untitled';
-          return html`<div
-            class="link"
-            @click=${(e: MouseEvent) => {
-              this._handleLinkClick(e, id);
-            }}
-          >
-            ${SmallLinkedDocIcon}
-            <div>${title}</div>
-          </div>`;
-        }
-      )}
-    </div> `;
-  }
-
   private get _backLinks() {
     const { doc } = this;
     const { collection } = doc;
     const backLinks = new Map<string, string[]>();
-    collection.indexer.backlink.getBacklink(doc.id).reduce((map, link) => {
+    collection.indexer.backlink?.getBacklink(doc.id).reduce((map, link) => {
       const { pageId } = link;
       if (map.has(pageId)) {
         map.get(pageId)!.push(link.blockId);
@@ -335,96 +226,6 @@ export class BiDirectionalLinkPanel extends WithDisposable(LitElement) {
     }, backLinks);
 
     return backLinks;
-  }
-
-  private _renderBackLinks(backLinks: Map<string, string[]>) {
-    const { doc } = this;
-    const { collection } = doc;
-    const length = backLinks.size;
-
-    return html` <div class="back-links">
-      <div class="back-links-title">${`Backlinks · ${length}`}</div>
-      ${repeat(
-        backLinks.keys(),
-        id => id,
-        (docId, index) => {
-          const doc = collection.getDoc(docId);
-          const blocks = backLinks.get(docId)!;
-          assertExists(doc);
-          const show = this._backLinkShow[index] ?? false;
-
-          const listService = this._host!.spec.getService('affine:list');
-
-          return html`<style>
-              .affine-list-block__prefix{
-                display: flex;
-                align-items: center;
-              }
-
-              .rich-text{
-                display: flex;
-                align-items: center;
-              }
-
-              ${listService.styles.prefix}
-              ${listService.styles.toggle}
-            </style>
-            <div class="back-link">
-              <div class="back-link-title">
-                <div
-                  class="arrow"
-                  style=${styleMap({
-                    transform: `rotate(${show ? 90 : 0}deg)`,
-                  })}
-                  @click=${() => {
-                    this._backLinkShow[index] = !show;
-                    this.requestUpdate();
-                  }}
-                >
-                  ${ArrowLeftIcon}
-                </div>
-                <div>
-                  ${SmallLinkedDocIcon}${doc.meta?.title
-                    ? doc.meta.title
-                    : 'Untitled'}
-                </div>
-              </div>
-              <div class="back-links-container">
-                <div class="back-links-container-left-divider">
-                  <div></div>
-                </div>
-                <div class="back-links-blocks-container">
-                  ${show
-                    ? repeat(
-                        blocks,
-                        blockId => blockId,
-                        blockId => {
-                          const model = doc.getBlockById(blockId);
-                          if (!model) return nothing;
-                          return this._backlink(model, docId, blockId);
-                        }
-                      )
-                    : nothing}
-                </div>
-              </div>
-            </div>`;
-        }
-      )}
-    </div>`;
-  }
-
-  private _handleLinkClick(e: MouseEvent, docId: string, blockId?: string) {
-    if (e.shiftKey && this._rootService.peekViewService) {
-      this._rootService.peekViewService.peek({
-        docId,
-        blockId,
-      });
-    } else {
-      this.pageRoot.slots.docLinkClicked.emit({
-        docId,
-        blockId,
-      });
-    }
   }
 
   private _backlink(model: BlockModel<object>, docId: string, blockId: string) {
@@ -440,7 +241,7 @@ export class BiDirectionalLinkPanel extends WithDisposable(LitElement) {
 
     let icon: TemplateResult<1> | null = null;
     if (matchFlavours(model, ['affine:list'])) {
-      const listService = this._host!.spec.getService('affine:list');
+      const listService = this._host.spec.getService('affine:list');
 
       icon = listService.styles.icon(model, false, () => {});
     }
@@ -503,6 +304,217 @@ export class BiDirectionalLinkPanel extends WithDisposable(LitElement) {
     `;
   }
 
+  private _handleLinkClick(e: MouseEvent, docId: string, blockId?: string) {
+    if (e.shiftKey && this._rootService.peekViewService) {
+      this._rootService.peekViewService
+        .peek({
+          docId,
+          blockId,
+        })
+        .catch(console.error);
+    } else {
+      this.pageRoot.slots.docLinkClicked.emit({
+        docId,
+        blockId,
+      });
+    }
+  }
+
+  private get _host() {
+    return this.pageRoot.host;
+  }
+
+  private get _links() {
+    const { doc } = this;
+
+    const ids = new Set<string>();
+    doc
+      .getBlockByFlavour([
+        'affine:paragraph',
+        'affine:list',
+        'affine:embed-linked-doc',
+        'affine:embed-synced-doc',
+      ])
+      .forEach(model => {
+        if (model.text) {
+          const deltas: DeltaInsert<AffineTextAttributes>[] =
+            model.text.yText.toDelta();
+
+          deltas.forEach(delta => {
+            if (delta.attributes?.reference?.pageId)
+              ids.add(delta.attributes.reference.pageId);
+          });
+        } else if (
+          matchFlavours(model, [
+            'affine:embed-linked-doc',
+            'affine:embed-synced-doc',
+          ])
+        ) {
+          ids.add(model.pageId);
+        }
+      });
+
+    return Array.from(ids);
+  }
+
+  private _renderBackLinks(backLinks: Map<string, string[]>) {
+    const { doc } = this;
+    const { collection } = doc;
+    const length = backLinks.size;
+
+    return html` <div class="back-links">
+      <div class="back-links-title">${`Backlinks · ${length}`}</div>
+      ${repeat(
+        backLinks.keys(),
+        id => id,
+        (docId, index) => {
+          const doc = collection.getDoc(docId);
+          const blocks = backLinks.get(docId)!;
+          assertExists(doc);
+          const show = this._backLinkShow[index] ?? false;
+
+          const listService = this._host.spec.getService('affine:list');
+
+          return html`<style>
+              .affine-list-block__prefix{
+                display: flex;
+                align-items: center;
+              }
+
+              .rich-text{
+                display: flex;
+                align-items: center;
+              }
+
+              ${listService.styles.prefix}
+              ${listService.styles.toggle}
+            </style>
+            <div class="back-link">
+              <div class="back-link-title">
+                <div
+                  class="arrow"
+                  style=${styleMap({
+                    transform: `rotate(${show ? 90 : 0}deg)`,
+                  })}
+                  @click=${() => {
+                    this._backLinkShow[index] = !show;
+                    this.requestUpdate();
+                  }}
+                >
+                  ${ArrowLeftIcon}
+                </div>
+                <div>
+                  ${SmallLinkedDocIcon}${doc.meta?.title
+                    ? doc.meta.title
+                    : 'Untitled'}
+                </div>
+              </div>
+              <div class="back-links-container">
+                <div class="back-links-container-left-divider">
+                  <div></div>
+                </div>
+                <div class="back-links-blocks-container">
+                  ${show
+                    ? repeat(
+                        blocks,
+                        blockId => blockId,
+                        blockId => {
+                          const model = doc.getBlockById(blockId);
+                          if (!model) return nothing;
+                          return this._backlink(model, docId, blockId);
+                        }
+                      )
+                    : nothing}
+                </div>
+              </div>
+            </div>`;
+        }
+      )}
+    </div>`;
+  }
+
+  private _renderLinks(ids: string[]) {
+    const { collection } = this.doc;
+
+    return html`<div class="links">
+      <div class="links-title">Outgoing links · ${ids.length}</div>
+      ${repeat(
+        ids,
+        id => id,
+        id => {
+          const doc = collection.getDoc(id);
+
+          const isDeleted = !doc;
+
+          const title = isDeleted
+            ? 'Deleted doc'
+            : !doc.meta
+              ? 'Untitled'
+              : doc.meta.title;
+
+          const icon = isDeleted ? SmallDeleteIcon : SmallLinkedDocIcon;
+
+          return html`<div
+            class=${`link ${isDeleted ? 'deleted' : ''}`}
+            @click=${(e: MouseEvent) => {
+              this._handleLinkClick(e, id);
+            }}
+          >
+            ${icon}
+            <div>${title}</div>
+          </div>`;
+        }
+      )}
+    </div> `;
+  }
+
+  private get _rootService() {
+    return this._host.spec.getService('affine:page');
+  }
+
+  private _toggleShow() {
+    this._show = !this._show;
+    this._rootService.editPropsStore.setStorage(
+      'showBidirectional',
+      this._show
+    );
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    const config = new ReferenceNodeConfig();
+    config.setInteractable(false);
+    config.setDoc(this.doc);
+    config.setCustomContent((reference: AffineReference) => {
+      const title = reference.doc.meta?.title
+        ? reference.doc.meta.title
+        : 'Untitled';
+      return html`<style>
+          .custom-reference-content svg {
+            position: relative;
+            top: 2px;
+          }
+        </style>
+        <span class="custom-reference-content">
+          ${SmallLinkedDocIcon} ${title}
+        </span> `;
+    });
+    this._inlineManager.registerSpecs(
+      getAffineInlineSpecsWithReference(config)
+    );
+    if (this.doc.collection.indexer.backlink) {
+      const { _disposables } = this;
+      _disposables.add(
+        this.doc.collection.indexer.backlink.slots.indexUpdated.on(() => {
+          this.requestUpdate();
+        })
+      );
+    }
+
+    this._show =
+      !!this._rootService.editPropsStore.getStorage('showBidirectional');
+  }
+
   protected override render() {
     const links = this._links;
     const backLinks = this._backLinks;
@@ -544,6 +556,18 @@ export class BiDirectionalLinkPanel extends WithDisposable(LitElement) {
         ? html`${this._renderBackLinks(backLinks)} ${this._renderLinks(links)} `
         : nothing} `;
   }
+
+  @state()
+  private accessor _backLinkShow: boolean[] = [];
+
+  @state()
+  private accessor _show = false;
+
+  @property({ attribute: false })
+  accessor doc!: Doc;
+
+  @property({ attribute: false })
+  accessor pageRoot!: PageRootBlockComponent;
 }
 
 declare global {

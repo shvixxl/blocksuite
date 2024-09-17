@@ -1,6 +1,7 @@
 import { Slot } from '@blocksuite/store';
 
 import type { Viewport } from '../../_common/utils/index.js';
+
 import { RootService } from '../root-service.js';
 
 export class PageRootService extends RootService {
@@ -13,6 +14,5 @@ export class PageRootService extends RootService {
       tagId: string;
     }>(),
     viewportUpdated: new Slot<Viewport>(),
-    editorModeSwitch: new Slot<'edgeless' | 'page'>(),
   };
 }

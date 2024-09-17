@@ -3,6 +3,7 @@ import { expect } from '@playwright/test';
 
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import {
+  Shape,
   activeNoteInEdgeless,
   createConnectorElement,
   createNote,
@@ -11,7 +12,6 @@ import {
   getConnectorPath,
   locatorComponentToolbarMoreButton,
   selectNoteInEdgeless,
-  Shape,
   triggerComponentToolbarAction,
 } from '../utils/actions/edgeless.js';
 import {
@@ -43,9 +43,9 @@ test.describe('note to linked doc', () => {
     const embedSyncedBlock = page.locator('affine-embed-synced-doc-block');
     assertExists(embedSyncedBlock);
 
-    await triggerComponentToolbarAction(page, 'linkedDocInfo');
+    await triggerComponentToolbarAction(page, 'openLinkedDoc');
     await waitNextFrame(page, 200);
-    const noteBlock = page.locator('affine-note');
+    const noteBlock = page.locator('affine-edgeless-note');
     assertExists(noteBlock);
     const noteContent = await noteBlock.innerText();
     expect(noteContent).toBe('Hello\nWorld');
@@ -308,6 +308,32 @@ test.describe('multiple edgeless elements to linked doc', () => {
     expect(nodes).toEqual({
       blocks: ['affine:embed-synced-doc'],
       elements: ['shape', 'connector'],
+    });
+  });
+
+  test('multi-select with mindmap, turn it into a linked doc', async ({
+    page,
+  }) => {
+    await edgelessCommonSetup(page);
+    await triggerComponentToolbarAction(page, 'addMindmap');
+
+    await selectAllByKeyboard(page);
+    await triggerComponentToolbarAction(page, 'createLinkedDoc');
+    await waitNextFrame(page, 200);
+    const linkedSyncedBlock = page.locator('affine-linked-synced-doc-block');
+    assertExists(linkedSyncedBlock);
+
+    await triggerComponentToolbarAction(page, 'openLinkedDoc');
+    await waitNextFrame(page, 200);
+    const nodes = await page.evaluate(() => {
+      const container = document.querySelector('affine-edgeless-root');
+      const elements = container!.service.elements.map(s => s.type);
+      const blocks = container!.service.blocks.map(b => b.flavour);
+      return { blocks, elements };
+    });
+    expect(nodes).toEqual({
+      blocks: [],
+      elements: ['mindmap', 'shape', 'shape', 'shape', 'shape'],
     });
   });
 });

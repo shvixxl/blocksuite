@@ -1,10 +1,9 @@
-import { type ReferenceElement } from '@floating-ui/dom';
+import type { TType } from '../../logical/typesystem.js';
 
 import { Matcher } from '../../logical/matcher.js';
-import type { TType } from '../../logical/typesystem.js';
 import {
-  renderUniLit,
   type UniComponent,
+  renderUniLit,
 } from '../../utils/uni-component/uni-component.js';
 
 export const renderLiteral = (
@@ -20,7 +19,7 @@ export const renderLiteral = (
 };
 
 export const popLiteralEdit = (
-  target: ReferenceElement,
+  target: HTMLElement,
   type: TType,
   value: unknown,
   onChange: (value: unknown) => void
@@ -39,6 +38,6 @@ export type LiteralViewProps<Value = unknown, Type extends TType = TType> = {
 };
 export type LiteralData<Value = unknown> = {
   view: UniComponent<LiteralViewProps<Value>>;
-  popEdit: (position: ReferenceElement, props: LiteralViewProps<Value>) => void;
+  popEdit: (position: HTMLElement, props: LiteralViewProps<Value>) => void;
 };
 export const literalMatcher = new Matcher<LiteralData>();

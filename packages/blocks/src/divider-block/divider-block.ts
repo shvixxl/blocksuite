@@ -3,13 +3,14 @@
 import { html } from 'lit';
 import { customElement } from 'lit/decorators.js';
 
-import { BlockComponent } from '../_common/components/block-component.js';
-import { BLOCK_CHILDREN_CONTAINER_PADDING_LEFT } from '../_common/consts.js';
 import type { DividerBlockModel } from './divider-model.js';
+
+import { CaptionedBlockComponent } from '../_common/components/captioned-block-component.js';
+import { BLOCK_CHILDREN_CONTAINER_PADDING_LEFT } from '../_common/consts.js';
 import { dividerBlockStyles } from './styles.js';
 
 @customElement('affine-divider')
-export class DividerBlockComponent extends BlockComponent<DividerBlockModel> {
+export class DividerBlockComponent extends CaptionedBlockComponent<DividerBlockModel> {
   static override styles = dividerBlockStyles;
 
   override connectedCallback() {
@@ -18,7 +19,7 @@ export class DividerBlockComponent extends BlockComponent<DividerBlockModel> {
     this.contentEditable = 'false';
 
     this.handleEvent('click', () => {
-      this.host.selection.set([
+      this.host.selection.setGroup('note', [
         this.host.selection.create('block', {
           blockId: this.blockId,
         }),

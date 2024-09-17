@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { type Page, expect } from '@playwright/test';
 
 import {
   assertEdgelessTool,
@@ -29,6 +29,7 @@ import {
   focusRichText,
   initEmptyEdgelessState,
   pasteByKeyboard,
+  pressEscape,
   type,
   waitNextFrame,
 } from '../utils/actions/index.js';
@@ -205,19 +206,19 @@ test('the tooltip of shape tool button should be hidden when the shape menu is s
   await initEmptyEdgelessState(page);
   await switchEditorMode(page);
 
-  const shapeTool = locatorEdgelessToolButton(page, 'shape');
+  const shapeTool = await locatorEdgelessToolButton(page, 'shape');
   const shapeToolBox = await shapeTool.boundingBox();
   const tooltip = page.locator('.affine-tooltip');
 
   assertExists(shapeToolBox);
 
-  await page.mouse.move(shapeToolBox.x + 20, shapeToolBox.y + 20);
+  await page.mouse.move(shapeToolBox.x + 2, shapeToolBox.y + 2);
   await expect(tooltip).toBeVisible();
 
-  await page.mouse.click(shapeToolBox.x + 20, shapeToolBox.y + 20);
+  await page.mouse.click(shapeToolBox.x + 2, shapeToolBox.y + 2);
   await expect(tooltip).toBeHidden();
 
-  await page.mouse.click(shapeToolBox.x + 20, shapeToolBox.y + 20);
+  await page.mouse.click(shapeToolBox.x + 2, shapeToolBox.y + 2);
   await expect(tooltip).toBeVisible();
 });
 
@@ -263,18 +264,18 @@ test('edgeless toolbar shape menu shows up and close normally', async ({
   const toolbarLocator = page.locator('.edgeless-toolbar-container');
   await expect(toolbarLocator).toBeVisible();
 
-  const shapeTool = locatorEdgelessToolButton(page, 'shape');
+  const shapeTool = await locatorEdgelessToolButton(page, 'shape');
   const shapeToolBox = await shapeTool.boundingBox();
 
   assertExists(shapeToolBox);
 
-  await page.mouse.click(shapeToolBox.x + 20, shapeToolBox.y + 20);
+  await page.mouse.click(shapeToolBox.x + 2, shapeToolBox.y + 2);
 
   const shapeMenu = page.locator('edgeless-shape-menu');
   await expect(shapeMenu).toBeVisible();
   await page.waitForTimeout(500);
 
-  await page.mouse.click(shapeToolBox.x + 20, shapeToolBox.y + 20);
+  await page.mouse.click(shapeToolBox.x + 2, shapeToolBox.y + 2);
   await page.waitForTimeout(500);
   await expect(shapeMenu).toBeHidden();
 });
@@ -291,7 +292,7 @@ test('hovering on shape should not have effect on underlying block', async ({
 
   await switchEditorMode(page);
 
-  const block = page.locator('.edgeless-block-portal-note');
+  const block = page.locator('affine-edgeless-note');
   const blockBox = await block.boundingBox();
   if (blockBox === null) throw new Error('Unexpected box value: box is null');
 
@@ -437,6 +438,30 @@ test('dbclick to add text in shape', async ({ page }) => {
 
   await pasteByKeyboard(page);
   await assertEdgelessCanvasText(page, 'hdddello');
+});
+
+test('should show selected rect after exiting editing by pressing Escape', async ({
+  page,
+}) => {
+  await enterPlaygroundRoom(page);
+  await initEmptyEdgelessState(page);
+  await switchEditorMode(page);
+  await zoomResetByKeyboard(page);
+
+  await setEdgelessTool(page, 'shape');
+  await waitNextFrame(page, 500);
+
+  await dragBetweenCoords(page, { x: 100, y: 100 }, { x: 200, y: 200 });
+
+  await waitNextFrame(page);
+  await page.mouse.dblclick(150, 150);
+  await waitNextFrame(page);
+
+  await type(page, 'hello');
+  await assertEdgelessCanvasText(page, 'hello');
+
+  await pressEscape(page);
+  await assertEdgelessSelectedRect(page, [100, 100, 100, 100]);
 });
 
 test('auto wrap text in shape', async ({ page }) => {
@@ -605,7 +630,11 @@ test.describe('shape hit test', () => {
   }
 
   test.beforeEach(async ({ page }) => {
-    await enterPlaygroundRoom(page);
+    await enterPlaygroundRoom(page, {
+      flags: {
+        enable_edgeless_text: false,
+      },
+    });
     await initEmptyEdgelessState(page);
     await switchEditorMode(page);
   });
@@ -649,5 +678,45 @@ test.describe('shape hit test', () => {
 
     await type(page, 'hello');
     await assertEdgelessCanvasText(page, 'hello');
+  });
+
+  test('should enter edit mode when double-clicking a text area in a shape with a transparent background', async ({
+    page,
+  }) => {
+    await addTransparentRect(page, rect.start, rect.end);
+    await page.mouse.click(rect.start.x - 20, rect.start.y - 20);
+    await assertEdgelessNonSelectedRect(page);
+
+    await assertEdgelessTool(page, 'default');
+    await page.mouse.dblclick(rect.start.x + 50, rect.start.y + 50);
+    await waitNextFrame(page);
+    await type(page, 'hello');
+
+    await pressEscape(page);
+    await waitNextFrame(page);
+
+    const textAlignBtn = locatorComponentToolbar(page).getByRole('button', {
+      name: 'Alignment',
+    });
+    await textAlignBtn.click();
+
+    await page
+      .locator('edgeless-align-panel')
+      .getByRole('button', { name: 'Left' })
+      .click();
+
+    // creates an edgeless-text
+    await page.mouse.dblclick(rect.start.x + 80, rect.start.y + 20);
+    await waitNextFrame(page);
+    await page.locator('edgeless-text-editor').isVisible();
+
+    await pressEscape(page);
+    await waitNextFrame(page);
+
+    // enters edit mode
+    await page.mouse.dblclick(rect.start.x + 20, rect.start.y + 50);
+    await page.locator('edgeless-shape-text-editor').isVisible();
+    await type(page, ' world');
+    await assertEdgelessCanvasText(page, 'hello world');
   });
 });

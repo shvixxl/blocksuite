@@ -1,4 +1,5 @@
 import type { EditorHost } from '@blocksuite/block-std';
+
 import { PaymentRequiredError, UnauthorizedError } from '@blocksuite/blocks';
 import { Slot } from '@blocksuite/store';
 
@@ -35,13 +36,20 @@ export type ActionEventType =
  * todo: breakdown into different parts?
  */
 export class AIProvider {
-  private static readonly instance = new AIProvider();
+  // track the history of triggered actions (in memory only)
+  private readonly actionHistory: {
+    action: keyof BlockSuitePresets.AIActions;
+    options: BlockSuitePresets.AITextActionOptions;
+  }[] = [];
+
   private readonly actions: Partial<BlockSuitePresets.AIActions> = {};
-  private userInfoFn: () => AIUserInfo | Promise<AIUserInfo> | null = () =>
-    null;
-  private photoEngine: BlockSuitePresets.AIPhotoEngineService | null = null;
+
   private histories: BlockSuitePresets.AIHistoryService | null = null;
-  private toggleGeneralAIOnboarding: ((value: boolean) => void) | null = null;
+
+  private static readonly instance = new AIProvider();
+
+  private photoEngine: BlockSuitePresets.AIPhotoEngineService | null = null;
+
   private readonly slots = {
     // use case: when user selects "continue in chat" in an ask ai result panel
     // do we need to pass the context to the chat panel?
@@ -61,14 +69,30 @@ export class AIProvider {
     // add more if needed
   };
 
+  private toggleGeneralAIOnboarding: ((value: boolean) => void) | null = null;
+
+  private userInfoFn: () => AIUserInfo | Promise<AIUserInfo> | null = () =>
+    null;
+
   static LAST_ACTION_SESSIONID = '';
 
   static MAX_LOCAL_HISTORY = 10;
-  // track the history of triggered actions (in memory only)
-  private readonly actionHistory: {
-    action: keyof BlockSuitePresets.AIActions;
-    options: BlockSuitePresets.AITextActionOptions;
-  }[] = [];
+
+  static get actionHistory() {
+    return AIProvider.instance.actionHistory;
+  }
+
+  static get actions() {
+    return AIProvider.instance.actions;
+  }
+
+  static get histories() {
+    return AIProvider.instance.histories;
+  }
+
+  static get photoEngine() {
+    return AIProvider.instance.photoEngine;
+  }
 
   static provide(
     id: 'userInfo',
@@ -112,6 +136,18 @@ export class AIProvider {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       AIProvider.instance.provideAction(id as any, action as any);
     }
+  }
+
+  static get slots() {
+    return AIProvider.instance.slots;
+  }
+
+  static get toggleGeneralAIOnboarding() {
+    return AIProvider.instance.toggleGeneralAIOnboarding;
+  }
+
+  static get userInfo() {
+    return AIProvider.instance.userInfoFn();
   }
 
   private provideAction<T extends keyof BlockSuitePresets.AIActions>(
@@ -212,33 +248,5 @@ export class AIProvider {
           });
       }
     };
-  }
-
-  static get slots() {
-    return AIProvider.instance.slots;
-  }
-
-  static get actions() {
-    return AIProvider.instance.actions;
-  }
-
-  static get userInfo() {
-    return AIProvider.instance.userInfoFn();
-  }
-
-  static get photoEngine() {
-    return AIProvider.instance.photoEngine;
-  }
-
-  static get histories() {
-    return AIProvider.instance.histories;
-  }
-
-  static get actionHistory() {
-    return AIProvider.instance.actionHistory;
-  }
-
-  static get toggleGeneralAIOnboarding() {
-    return AIProvider.instance.toggleGeneralAIOnboarding;
   }
 }

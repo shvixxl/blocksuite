@@ -1,25 +1,35 @@
+import type { Bound } from '@blocksuite/global/utils';
+import type { SerializedXYWH } from '@blocksuite/global/utils';
+
 import type { TextAlign, TextVerticalAlign } from '../../../consts.js';
 import type { ShapeElementModel } from '../../../element-model/shape.js';
-import type { Bound } from '../../../index.js';
 import type { Renderer } from '../../renderer.js';
+
 import {
+  type TextDelta,
   deltaInsertsToChunks,
   getFontString,
   getLineHeight,
   getLineWidth,
   getTextWidth,
-  type TextDelta,
+  measureTextInDOM,
   wrapText,
   wrapTextDeltas,
 } from '../text/utils.js';
 
-export const SHAPE_TEXT_PADDING = 20;
-export const SHAPE_TEXT_VERTICAL_PADDING = 10;
+export type Colors = {
+  color: string;
+  fillColor: string;
+  strokeColor: string;
+};
 
 export function drawGeneralShape(
   ctx: CanvasRenderingContext2D,
   shapeModel: ShapeElementModel,
-  renderer: Renderer
+  renderer: Renderer,
+  filled: boolean,
+  fillColor: string,
+  strokeColor: string
 ) {
   const sizeOffset = Math.max(shapeModel.strokeWidth, 0);
   const w = Math.max(shapeModel.w - sizeOffset, 0);
@@ -40,8 +50,8 @@ export function drawGeneralShape(
   }
 
   ctx.lineWidth = shapeModel.strokeWidth;
-  ctx.strokeStyle = renderer.getVariableColor(shapeModel.strokeColor);
-  ctx.fillStyle = renderer.getVariableColor(shapeModel.fillColor);
+  ctx.strokeStyle = strokeColor;
+  ctx.fillStyle = filled ? fillColor : 'transparent';
 
   switch (shapeModel.strokeStyle) {
     case 'none':
@@ -49,11 +59,28 @@ export function drawGeneralShape(
       break;
     case 'dash':
       ctx.setLineDash([12, 12]);
-      ctx.strokeStyle = renderer.getVariableColor(shapeModel.strokeStyle);
       break;
-    default:
-      ctx.strokeStyle = renderer.getVariableColor(shapeModel.strokeStyle);
   }
+
+  if (shapeModel.shadow) {
+    const { blur, offsetX, offsetY, color } = shapeModel.shadow;
+    const scale = ctx.getTransform().a;
+
+    ctx.shadowBlur = blur * scale;
+    ctx.shadowOffsetX = offsetX * scale;
+    ctx.shadowOffsetY = offsetY * scale;
+    ctx.shadowColor = renderer.getPropertyValue(color);
+  }
+
+  ctx.stroke();
+  ctx.fill();
+
+  if (shapeModel.shadow) {
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+  }
+
   ctx.fill();
   ctx.stroke();
 }
@@ -126,25 +153,30 @@ function drawTriangle(
   ctx.closePath();
 }
 
-export function horizontalOffset(width: number, textAlign: TextAlign) {
+export function horizontalOffset(
+  width: number,
+  textAlign: TextAlign,
+  horiPadding: number
+) {
   return textAlign === 'center'
     ? width / 2
     : textAlign === 'right'
-      ? width - SHAPE_TEXT_PADDING
-      : SHAPE_TEXT_PADDING;
+      ? width - horiPadding
+      : horiPadding;
 }
 
 export function verticalOffset(
   lines: TextDelta[][],
   lineHeight: number,
   height: number,
-  textVerticalAlign: TextVerticalAlign
+  textVerticalAlign: TextVerticalAlign,
+  verticalPadding: number
 ) {
   return textVerticalAlign === 'center'
-    ? (height - lineHeight * lines.length) / 2
+    ? Math.max((height - lineHeight * lines.length) / 2, verticalPadding)
     : textVerticalAlign === 'top'
-      ? SHAPE_TEXT_VERTICAL_PADDING
-      : height - lineHeight * lines.length - SHAPE_TEXT_VERTICAL_PADDING;
+      ? verticalPadding
+      : height - lineHeight * lines.length - verticalPadding;
 }
 export function normalizeShapeBound(
   shape: ShapeElementModel,
@@ -152,9 +184,10 @@ export function normalizeShapeBound(
 ): Bound {
   if (!shape.text) return bound;
 
+  const [verticalPadding, horiPadding] = shape.padding;
   const yText = shape.text;
   const { fontFamily, fontSize, fontStyle, fontWeight } = shape;
-  const lineHeight = getLineHeight(fontFamily, fontSize);
+  const lineHeight = getLineHeight(fontFamily, fontSize, fontWeight);
   const font = getFontString({
     fontStyle,
     fontWeight,
@@ -167,19 +200,19 @@ export function normalizeShapeBound(
       .sort((a, b) => a - b)
       .pop() ?? getTextWidth('W', font);
 
-  if (bound.w < widestCharWidth + SHAPE_TEXT_PADDING * 2) {
-    bound.w = widestCharWidth + SHAPE_TEXT_PADDING * 2;
+  if (bound.w < widestCharWidth + horiPadding * 2) {
+    bound.w = widestCharWidth + horiPadding * 2;
   }
   const deltas: TextDelta[] = (yText.toDelta() as TextDelta[]).flatMap(
     delta => ({
-      insert: wrapText(delta.insert, font, bound.w - SHAPE_TEXT_PADDING * 2),
+      insert: wrapText(delta.insert, font, bound.w - horiPadding * 2),
       attributes: delta.attributes,
     })
   ) as TextDelta[];
   const lines = deltaInsertsToChunks(deltas);
 
-  if (bound.h < lineHeight * lines.length + SHAPE_TEXT_VERTICAL_PADDING * 2) {
-    bound.h = lineHeight * lines.length + SHAPE_TEXT_VERTICAL_PADDING * 2;
+  if (bound.h < lineHeight * lines.length + verticalPadding * 2) {
+    bound.h = lineHeight * lines.length + verticalPadding * 2;
   }
 
   return bound;
@@ -192,10 +225,15 @@ export function fitContent(shape: ShapeElementModel) {
     return;
   }
 
+  const [verticalPadding, horiPadding] = shape.padding;
   const lines = deltaInsertsToChunks(
     wrapTextDeltas(shape.text, font, shape.maxWidth || Number.MAX_SAFE_INTEGER)
   );
-  const lineHeight = getLineHeight(font, shape.fontSize);
+  const { lineHeight, lineGap } = measureTextInDOM(
+    shape.fontFamily,
+    shape.fontSize,
+    shape.fontWeight
+  );
   let maxWidth = 0;
   let height = 0;
 
@@ -204,12 +242,18 @@ export function fitContent(shape: ShapeElementModel) {
       const str = delta.insert;
 
       maxWidth = Math.max(maxWidth, getLineWidth(str, font));
-      height += lineHeight;
+      height += lineHeight + lineGap;
     }
   });
 
-  maxWidth += SHAPE_TEXT_PADDING * 2;
-  height += SHAPE_TEXT_VERTICAL_PADDING * 2;
+  height = Math.max(lineHeight + lineGap, height);
 
-  shape.xywh = `[${shape.x},${shape.y},${maxWidth},${height}]`;
+  maxWidth += horiPadding * 2;
+  height += verticalPadding * 2;
+
+  const newXYWH = `[${shape.x},${shape.y},${maxWidth},${height}]`;
+
+  if (shape.xywh !== newXYWH) {
+    shape.xywh = newXYWH as SerializedXYWH;
+  }
 }

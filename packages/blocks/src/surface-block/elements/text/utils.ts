@@ -1,6 +1,7 @@
 // something comes from https://github.com/excalidraw/excalidraw/blob/b1311a407a636c87ee0ca326fd20599d0ce4ba9b/src/utils.ts
 
 import type { FontFamily } from '../../consts.js';
+
 import { wrapFontFamily } from '../../utils/font.js';
 
 const RS_LTR_CHARS =
@@ -144,7 +145,7 @@ export function parseTokens(text: string): string[] {
 }
 
 export const charWidth = (() => {
-  const cachedCharWidth: { [key: string]: Array<number> } = {};
+  const cachedCharWidth: Record<string, Array<number>> = {};
 
   const calculate = (char: string, font: string) => {
     const ascii = char.charCodeAt(0);

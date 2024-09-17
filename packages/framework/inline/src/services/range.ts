@@ -10,8 +10,8 @@ import type {
   TextPoint,
 } from '../types.js';
 import type { BaseTextAttributes } from '../utils/base-attributes.js';
+
 import { isMaybeInlineRangeEqual } from '../utils/inline-range.js';
-import { findDocumentOrShadowRoot } from '../utils/query.js';
 import {
   domRangeToInlineRange,
   inlineRangeToDomRange,
@@ -19,30 +19,168 @@ import {
 import { calculateTextLength, getTextNodesFromElement } from '../utils/text.js';
 
 export class RangeService<TextAttributes extends BaseTextAttributes> {
+  private _applyInlineRange = (inlineRange: InlineRange): void => {
+    const selection = document.getSelection();
+    if (!selection) {
+      return;
+    }
+    try {
+      const newRange = this.toDomRange(inlineRange);
+
+      if (!newRange) {
+        return;
+      }
+
+      selection.removeAllRanges();
+      selection.addRange(newRange);
+      this.editor.slots.inlineRangeApply.emit(newRange);
+    } catch (error) {
+      console.error('failed to apply inline range');
+      console.error(error);
+    }
+  };
+
   private _inlineRange: InlineRange | null = null;
-  private _lastStartRelativePosition: Y.RelativePosition | null = null;
+
   private _lastEndRelativePosition: Y.RelativePosition | null = null;
 
-  constructor(public readonly editor: InlineEditor<TextAttributes>) {}
+  private _lastStartRelativePosition: Y.RelativePosition | null = null;
 
-  get yText() {
-    return this.editor.yText;
-  }
+  focusEnd = (): void => {
+    this.setInlineRange({
+      index: this.editor.yTextLength,
+      length: 0,
+    });
+  };
 
-  get inlineRangeProvider() {
-    return this.editor.inlineRangeProvider;
-  }
+  focusIndex = (index: number): void => {
+    this.setInlineRange({
+      index,
+      length: 0,
+    });
+  };
 
-  get rootElement() {
-    return this.editor.rootElement;
-  }
+  focusStart = (): void => {
+    this.setInlineRange({
+      index: 0,
+      length: 0,
+    });
+  };
 
-  get lastStartRelativePosition() {
-    return this._lastStartRelativePosition;
-  }
-  get lastEndRelativePosition() {
-    return this._lastEndRelativePosition;
-  }
+  getInlineRange = (): InlineRange | null => {
+    if (this.inlineRangeProvider) {
+      return this.inlineRangeProvider.getInlineRange();
+    }
+
+    return this._inlineRange;
+  };
+
+  getInlineRangeFromElement = (element: Element): InlineRange | null => {
+    const range = document.createRange();
+    const text = element.querySelector('[data-v-text]');
+    if (!text) {
+      return null;
+    }
+    const textNode = text.childNodes[1];
+    assertExists(textNode instanceof Text);
+    range.setStart(textNode, 0);
+    range.setEnd(textNode, textNode.textContent?.length ?? 0);
+    const inlineRange = this.toInlineRange(range);
+    return inlineRange;
+  };
+
+  /**
+   * There are two cases to have the second line:
+   * 1. long text auto wrap in span element
+   * 2. soft break
+   */
+  isFirstLine = (inlineRange: InlineRange | null): boolean => {
+    if (!inlineRange || inlineRange.length > 0) return false;
+
+    const range = this.toDomRange(inlineRange);
+    if (!range) {
+      console.error('failed to convert inline range to domRange');
+      return false;
+    }
+
+    // check case 1:
+    const beforeText = this.editor.yTextString.slice(0, inlineRange.index);
+    if (beforeText.includes('\n')) {
+      return false;
+    }
+
+    // check case 2:
+    // If there is a wrapped text, there are two possible positions for
+    // cursor: (in first line and in second line)
+    // aaaaaaaa| or aaaaaaaa
+    // bb           |bb
+    // We have no way to distinguish them and we just assume that the cursor
+    // can not in the first line because if we apply the inline ranage manually the
+    // cursor will jump to the second line.
+    const container = range.commonAncestorContainer.parentElement;
+    assertExists(container);
+    const containerRect = container.getBoundingClientRect();
+    // There will be two rects if the cursor is at the edge of the line:
+    // aaaaaaaa| or aaaaaaaa
+    // bb           |bb
+    const rangeRects = range.getClientRects();
+    // We use last rect here to make sure we get the second rect.
+    // (Based on the assumption that the cursor can not in the first line)
+    const rangeRect = rangeRects[rangeRects.length - 1];
+    const tolerance = 1;
+    return Math.abs(rangeRect.top - containerRect.top) < tolerance;
+  };
+
+  /**
+   * There are two cases to have the second line:
+   * 1. long text auto wrap in span element
+   * 2. soft break
+   */
+  isLastLine = (inlineRange: InlineRange | null): boolean => {
+    if (!inlineRange || inlineRange.length > 0) return false;
+
+    // check case 1:
+    const afterText = this.editor.yTextString.slice(inlineRange.index);
+    if (afterText.includes('\n')) {
+      return false;
+    }
+
+    const range = this.toDomRange(inlineRange);
+    if (!range) {
+      console.error('failed to convert inline range to domRange');
+      return false;
+    }
+
+    // check case 2:
+    // If there is a wrapped text, there are two possible positions for
+    // cursor: (in first line and in second line)
+    // aaaaaaaa| or aaaaaaaa
+    // bb           |bb
+    // We have no way to distinguish them and we just assume that the cursor
+    // can not in the first line because if we apply the inline range manually the
+    // cursor will jump to the second line.
+    const container = range.commonAncestorContainer.parentElement;
+    assertExists(container);
+    const containerRect = container.getBoundingClientRect();
+    // There will be two rects if the cursor is at the edge of the line:
+    // aaaaaaaa| or aaaaaaaa
+    // bb           |bb
+    const rangeRects = range.getClientRects();
+    // We use last rect here to make sure we get the second rect.
+    // (Based on the assumption that the cursor can not be in the first line)
+    const rangeRect = rangeRects[rangeRects.length - 1];
+
+    const tolerance = 1;
+    return Math.abs(rangeRect.bottom - containerRect.bottom) < tolerance;
+  };
+
+  isValidInlineRange = (inlineRange: InlineRange | null): boolean => {
+    return !(
+      inlineRange &&
+      (inlineRange.index < 0 ||
+        inlineRange.index + inlineRange.length > this.editor.yText.length)
+    );
+  };
 
   onInlineRangeUpdated = async ([
     newInlineRange,
@@ -92,8 +230,7 @@ export class RangeService<TextAttributes extends BaseTextAttributes> {
     }
 
     if (this._inlineRange === null) {
-      const selectionRoot = findDocumentOrShadowRoot(this.editor);
-      const selection = selectionRoot.getSelection();
+      const selection = document.getSelection();
       if (selection && selection.rangeCount > 0) {
         const range = selection.getRangeAt(0);
         if (range.intersectsNode(this.editor.rootElement)) {
@@ -116,197 +253,21 @@ export class RangeService<TextAttributes extends BaseTextAttributes> {
     requestAnimationFrame(fn);
   };
 
-  getNativeSelection(): Selection | null {
-    const selectionRoot = findDocumentOrShadowRoot(this.editor);
-    const selection = selectionRoot.getSelection();
-    if (!selection) return null;
-    if (selection.rangeCount === 0) return null;
-
-    return selection;
-  }
-
-  getNativeRange(): Range | null {
-    const selection = this.getNativeSelection();
-    if (!selection) return null;
-    return selection.getRangeAt(0);
-  }
-
-  getInlineRange = (): InlineRange | null => {
-    if (this.inlineRangeProvider) {
-      return this.inlineRangeProvider.getInlineRange();
-    }
-
-    return this._inlineRange;
-  };
-
-  getInlineRangeFromElement = (element: Element): InlineRange | null => {
-    const range = document.createRange();
-    const text = element.querySelector('[data-v-text');
-    if (!text) {
-      return null;
-    }
-    const textNode = text.childNodes[1];
-    assertExists(textNode instanceof Text);
-    range.setStart(textNode, 0);
-    range.setEnd(textNode, textNode.textContent?.length ?? 0);
-    const inlineRange = this.toInlineRange(range);
-    return inlineRange;
-  };
-
-  getTextPoint(rangeIndex: InlineRange['index']): TextPoint {
-    const vLines = Array.from(this.rootElement.querySelectorAll('v-line'));
-
-    let index = 0;
-    for (const vLine of vLines) {
-      const texts = getTextNodesFromElement(vLine);
-
-      for (const text of texts) {
-        if (!text.textContent) {
-          throw new Error('text element should have textContent');
-        }
-        if (index + text.textContent.length >= rangeIndex) {
-          return [text, rangeIndex - index];
-        }
-        index += calculateTextLength(text);
-      }
-
-      index += 1;
-    }
-
-    throw new Error('failed to find leaf');
-  }
-
-  // the number is related to the VLine's textLength
-  getLine(rangeIndex: InlineRange['index']): {
-    line: VLine;
-    lineIndex: number;
-    rangeIndexRelatedToLine: number;
-  } {
-    const lineElements = Array.from(
-      this.rootElement.querySelectorAll('v-line')
-    );
-
-    let beforeIndex = 0;
-    for (const [lineIndex, lineElement] of lineElements.entries()) {
-      if (
-        rangeIndex >= beforeIndex &&
-        rangeIndex < beforeIndex + lineElement.vTextLength + 1
-      ) {
-        return {
-          line: lineElement,
-          lineIndex,
-          rangeIndexRelatedToLine: rangeIndex - beforeIndex,
-        };
-      }
-      beforeIndex += lineElement.vTextLength + 1;
-    }
-
-    throw new Error('failed to find line');
-  }
-
-  isValidInlineRange = (inlineRange: InlineRange | null): boolean => {
-    return !(
-      inlineRange &&
-      (inlineRange.index < 0 ||
-        inlineRange.index + inlineRange.length > this.editor.yText.length)
-    );
+  selectAll = (): void => {
+    this.setInlineRange({
+      index: 0,
+      length: this.editor.yTextLength,
+    });
   };
 
   /**
-   * There are two cases to have the second line:
-   * 1. long text auto wrap in span element
-   * 2. soft break
-   */
-  isFirstLine = (inlineRange: InlineRange | null): boolean => {
-    if (!inlineRange) return false;
-
-    if (inlineRange.length > 0) {
-      throw new Error('Inline range should be collapsed');
-    }
-
-    const range = this.toDomRange(inlineRange);
-    if (!range) {
-      throw new Error('failed to convert inline range to domRange');
-    }
-
-    // check case 1:
-    const beforeText = this.editor.yTextString.slice(0, inlineRange.index);
-    if (beforeText.includes('\n')) {
-      return false;
-    }
-
-    // check case 2:
-    // If there is a wrapped text, there are two possible positions for
-    // cursor: (in first line and in second line)
-    // aaaaaaaa| or aaaaaaaa
-    // bb           |bb
-    // We have no way to distinguish them and we just assume that the cursor
-    // can not in the first line because if we apply the inline ranage manually the
-    // cursor will jump to the second line.
-    const container = range.commonAncestorContainer.parentElement;
-    assertExists(container);
-    const containerRect = container.getBoundingClientRect();
-    // There will be two rects if the cursor is at the edge of the line:
-    // aaaaaaaa| or aaaaaaaa
-    // bb           |bb
-    const rangeRects = range.getClientRects();
-    // We use last rect here to make sure we get the second rect.
-    // (Based on the assumption that the cursor can not in the first line)
-    const rangeRect = rangeRects[rangeRects.length - 1];
-    return rangeRect.top === containerRect.top;
-  };
-
-  /**
-   * There are two cases to have the second line:
-   * 1. long text auto wrap in span element
-   * 2. soft break
-   */
-  isLastLine = (inlineRange: InlineRange | null): boolean => {
-    if (!inlineRange) return false;
-
-    if (inlineRange.length > 0) {
-      throw new Error('Inline range should be collapsed');
-    }
-
-    // check case 1:
-    const afterText = this.editor.yTextString.slice(inlineRange.index);
-    if (afterText.includes('\n')) {
-      return false;
-    }
-
-    const range = this.toDomRange(inlineRange);
-    if (!range) {
-      throw new Error('failed to convert inline range to domRange');
-    }
-
-    // check case 2:
-    // If there is a wrapped text, there are two possible positions for
-    // cursor: (in first line and in second line)
-    // aaaaaaaa| or aaaaaaaa
-    // bb           |bb
-    // We have no way to distinguish them and we just assume that the cursor
-    // can not in the first line because if we apply the inline ranage manually the
-    // cursor will jump to the second line.
-    const container = range.commonAncestorContainer.parentElement;
-    assertExists(container);
-    const containerRect = container.getBoundingClientRect();
-    // There will be two rects if the cursor is at the edge of the line:
-    // aaaaaaaa| or aaaaaaaa
-    // bb           |bb
-    const rangeRects = range.getClientRects();
-    // We use last rect here to make sure we get the second rect.
-    // (Based on the assumption that the cursor can not in the first line)
-    const rangeRect = rangeRects[rangeRects.length - 1];
-    return rangeRect.bottom === containerRect.bottom;
-  };
-
-  /**
-   * the inline ranage is synced to the native selection asynchronically
+   * the inline range is synced to the native selection asynchronously
    * if sync is true, the native selection will be synced immediately
    */
   setInlineRange = (inlineRange: InlineRange | null, sync = true): void => {
     if (!this.isValidInlineRange(inlineRange)) {
-      throw new Error('invalid inline range');
+      console.error('invalid inline range');
+      return;
     }
 
     if (this.inlineRangeProvider) {
@@ -315,34 +276,6 @@ export class RangeService<TextAttributes extends BaseTextAttributes> {
     }
 
     this.editor.slots.inlineRangeUpdate.emit([inlineRange, sync]);
-  };
-
-  focusEnd = (): void => {
-    this.setInlineRange({
-      index: this.editor.yTextLength,
-      length: 0,
-    });
-  };
-
-  focusStart = (): void => {
-    this.setInlineRange({
-      index: 0,
-      length: 0,
-    });
-  };
-
-  selectAll = (): void => {
-    this.setInlineRange({
-      index: 0,
-      length: this.editor.yTextLength,
-    });
-  };
-
-  focusIndex = (index: number): void => {
-    this.setInlineRange({
-      index,
-      length: 0,
-    });
   };
 
   /**
@@ -401,20 +334,94 @@ export class RangeService<TextAttributes extends BaseTextAttributes> {
     return domRangeToInlineRange(range, rootElement, yText);
   };
 
-  private _applyInlineRange = (inlineRange: InlineRange): void => {
-    const selectionRoot = findDocumentOrShadowRoot(this.editor);
-    const selection = selectionRoot.getSelection();
-    if (!selection) {
-      return;
-    }
-    const newRange = this.toDomRange(inlineRange);
+  constructor(readonly editor: InlineEditor<TextAttributes>) {}
 
-    if (!newRange) {
-      return;
+  // the number is related to the VLine's textLength
+  getLine(rangeIndex: InlineRange['index']): {
+    line: VLine;
+    lineIndex: number;
+    rangeIndexRelatedToLine: number;
+  } | null {
+    const lineElements = Array.from(
+      this.rootElement.querySelectorAll('v-line')
+    );
+
+    let beforeIndex = 0;
+    for (const [lineIndex, lineElement] of lineElements.entries()) {
+      if (
+        rangeIndex >= beforeIndex &&
+        rangeIndex < beforeIndex + lineElement.vTextLength + 1
+      ) {
+        return {
+          line: lineElement,
+          lineIndex,
+          rangeIndexRelatedToLine: rangeIndex - beforeIndex,
+        };
+      }
+      beforeIndex += lineElement.vTextLength + 1;
     }
 
-    selection.removeAllRanges();
-    selection.addRange(newRange);
-    this.editor.slots.inlineRangeApply.emit(newRange);
-  };
+    console.error('failed to find line');
+    return null;
+  }
+
+  getNativeRange(): Range | null {
+    const selection = this.getNativeSelection();
+    if (!selection) return null;
+    return selection.getRangeAt(0);
+  }
+
+  getNativeSelection(): Selection | null {
+    const selection = document.getSelection();
+    if (!selection) return null;
+    if (selection.rangeCount === 0) return null;
+
+    return selection;
+  }
+
+  getTextPoint(rangeIndex: InlineRange['index']): TextPoint | null {
+    const vLines = Array.from(this.rootElement.querySelectorAll('v-line'));
+
+    let index = 0;
+    for (const vLine of vLines) {
+      const texts = getTextNodesFromElement(vLine);
+      if (texts.length === 0) {
+        return null;
+      }
+
+      for (const text of texts) {
+        if (!text.textContent) {
+          return null;
+        }
+        if (index + text.textContent.length >= rangeIndex) {
+          return [text, rangeIndex - index];
+        }
+        index += calculateTextLength(text);
+      }
+
+      index += 1;
+    }
+
+    return null;
+  }
+
+  get inlineRangeProvider() {
+    return this.editor.inlineRangeProvider;
+  }
+
+  get lastEndRelativePosition() {
+    return this._lastEndRelativePosition;
+  }
+
+  get lastStartRelativePosition() {
+    return this._lastStartRelativePosition;
+  }
+
+  get rootElement() {
+    return this.editor.rootElement;
+  }
+
+  get yText() {
+    return this.editor.yText;
+  }
 }

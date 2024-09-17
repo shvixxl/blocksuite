@@ -7,8 +7,16 @@ const BlockSelectionSchema = z.object({
 });
 
 export class BlockSelection extends BaseSelection {
-  static override type = 'block';
   static override group = 'note';
+
+  static override type = 'block';
+
+  static override fromJSON(json: Record<string, unknown>): BlockSelection {
+    BlockSelectionSchema.parse(json);
+    return new BlockSelection({
+      blockId: json.blockId as string,
+    });
+  }
 
   override equals(other: BaseSelection): boolean {
     if (other instanceof BlockSelection) {
@@ -22,13 +30,6 @@ export class BlockSelection extends BaseSelection {
       type: 'block',
       blockId: this.blockId,
     };
-  }
-
-  static override fromJSON(json: Record<string, unknown>): BlockSelection {
-    BlockSelectionSchema.parse(json);
-    return new BlockSelection({
-      blockId: json.blockId as string,
-    });
   }
 }
 

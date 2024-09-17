@@ -1,9 +1,10 @@
 import { assertEquals } from '@blocksuite/global/utils';
-import { css, html, LitElement, type PropertyValues } from 'lit';
+import { LitElement, type PropertyValues, css, html } from 'lit';
 import { customElement, property, query } from 'lit/decorators.js';
 
-import { ColorUnit } from '../../../edgeless/components/panel/color-panel.js';
 import type { PieNode } from '../node.js';
+
+import { ColorUnit } from '../../../edgeless/components/panel/color-panel.js';
 import { isSubmenuNode } from '../utils.js';
 
 const styles = css`
@@ -24,40 +25,6 @@ const styles = css`
 export class PieNodeContent extends LitElement {
   static override styles = styles;
 
-  @property({ attribute: false })
-  accessor node!: PieNode;
-
-  @property({ attribute: false })
-  accessor isActive!: boolean;
-
-  @property({ attribute: false })
-  accessor hoveredNode!: PieNode | null;
-
-  @query('.node-content')
-  private accessor _nodeContentElement!: HTMLDivElement;
-
-  protected override updated(changedProperties: PropertyValues): void {
-    super.updated(changedProperties);
-
-    if (
-      !changedProperties.has('hoveredNode') ||
-      !this._nodeContentElement ||
-      !this.isActive
-    )
-      return;
-    const fadeIn = [
-      {
-        opacity: 0,
-      },
-      { opacity: 1 },
-    ];
-
-    this._nodeContentElement.animate(fadeIn, {
-      duration: 250,
-      easing: 'cubic-bezier(0.775, 1.325, 0.535, 1)',
-      fill: 'forwards' as const,
-    });
-  }
   private _renderCenterNodeContent() {
     if (isSubmenuNode(this.node.model) && !this.isActive) {
       return this._renderChildNodeContent();
@@ -111,6 +78,41 @@ export class PieNodeContent extends LitElement {
       </div>
     `;
   }
+
+  protected override updated(changedProperties: PropertyValues): void {
+    super.updated(changedProperties);
+
+    if (
+      !changedProperties.has('hoveredNode') ||
+      !this._nodeContentElement ||
+      !this.isActive
+    )
+      return;
+    const fadeIn = [
+      {
+        opacity: 0,
+      },
+      { opacity: 1 },
+    ];
+
+    this._nodeContentElement.animate(fadeIn, {
+      duration: 250,
+      easing: 'cubic-bezier(0.775, 1.325, 0.535, 1)',
+      fill: 'forwards' as const,
+    });
+  }
+
+  @query('.node-content')
+  private accessor _nodeContentElement!: HTMLDivElement;
+
+  @property({ attribute: false })
+  accessor hoveredNode!: PieNode | null;
+
+  @property({ attribute: false })
+  accessor isActive!: boolean;
+
+  @property({ attribute: false })
+  accessor node!: PieNode;
 }
 
 declare global {

@@ -1,11 +1,13 @@
 import { BlockService } from '@blocksuite/block-std';
 
+import type { SurfaceBlockModel } from './surface-model.js';
+
 import { reassociateConnectorsCommand } from './commands/reassociate-connectors.js';
 import { LayerManager } from './managers/layer-manager.js';
-import type { SurfaceBlockModel } from './surface-model.js';
 
 export class SurfaceBlockService extends BlockService<SurfaceBlockModel> {
   layer!: LayerManager;
+
   surface!: SurfaceBlockModel;
 
   override mounted(): void {

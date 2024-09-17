@@ -12,7 +12,7 @@ function number2letter(n: number) {
 
 // Derive from https://gist.github.com/imilu/00f32c61e50b7ca296f91e9d96d8e976
 export function number2roman(num: number) {
-  const lookup: { [key: string]: number } = {
+  const lookup: Record<string, number> = {
     M: 1000,
     CM: 900,
     D: 500,
@@ -38,8 +38,12 @@ export function number2roman(num: number) {
 }
 
 function getPrefix(depth: number, index: number) {
-  const map = [() => index + 1, number2letter, () => number2roman(index + 1)];
-  return map[depth % map.length](index);
+  const map = [
+    () => index,
+    () => number2letter(index - 1),
+    () => number2roman(index),
+  ];
+  return map[depth % map.length]();
 }
 
 export function getNumberPrefix(index: number, depth: number) {

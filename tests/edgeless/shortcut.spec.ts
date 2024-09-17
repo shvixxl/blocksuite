@@ -1,6 +1,7 @@
 import { expect } from '@playwright/test';
 
 import {
+  type ShapeName,
   addBasicRectShapeElement,
   assertEdgelessShapeType,
   createShapeElement,
@@ -9,7 +10,6 @@ import {
   getZoomLevel,
   locatorEdgelessToolButton,
   setEdgelessTool,
-  type ShapeName,
   switchEditorMode,
   zoomFitByKeyboard,
   zoomInByKeyboard,
@@ -43,28 +43,29 @@ test('shortcut', async ({ page }) => {
   await switchEditorMode(page);
   await page.mouse.click(100, 100);
 
-  await page.keyboard.press('t');
-  const textButton = locatorEdgelessToolButton(page, 'text');
-  await expect(textButton).toHaveAttribute('active', '');
+  // text is removed temporarily
+  // await page.keyboard.press('t');
+  // const textButton = await locatorEdgelessToolButton(page, 'text');
+  // await expect(textButton).toHaveAttribute('active', '');
 
   await page.keyboard.press('s');
-  const shapeButton = locatorEdgelessToolButton(page, 'shape');
+  const shapeButton = await locatorEdgelessToolButton(page, 'shape');
   await expect(shapeButton).toHaveAttribute('active', '');
 
   await page.keyboard.press('p');
-  const penButton = locatorEdgelessToolButton(page, 'brush');
+  const penButton = await locatorEdgelessToolButton(page, 'brush');
   await expect(penButton).toHaveAttribute('active', '');
 
   await page.keyboard.press('h');
-  const panButton = locatorEdgelessToolButton(page, 'pan');
+  const panButton = await locatorEdgelessToolButton(page, 'pan');
   await expect(panButton).toHaveAttribute('active', '');
 
   await page.keyboard.press('c');
-  const connectorButton = locatorEdgelessToolButton(page, 'connector');
+  const connectorButton = await locatorEdgelessToolButton(page, 'connector');
   await expect(connectorButton).toHaveAttribute('active', '');
 
   // await page.keyboard.press('l');
-  // const lassoButton = locatorEdgelessToolButton(page, 'lasso');
+  // const lassoButton = await locatorEdgelessToolButton(page, 'lasso');
   // await expect(lassoButton).toHaveAttribute('active', '');
 });
 
@@ -74,7 +75,7 @@ test.skip('toggle lasso tool modes', async ({ page }) => {
   await switchEditorMode(page);
   await page.mouse.click(100, 100);
 
-  const lassoButton = locatorEdgelessToolButton(page, 'lasso', false);
+  const lassoButton = await locatorEdgelessToolButton(page, 'lasso', false);
 
   const isLassoMode = async (type: 'freehand' | 'polygonal') => {
     const classes = (await lassoButton.getAttribute('class'))?.split(' ') ?? [];
@@ -280,9 +281,9 @@ test.describe('delete', () => {
     const box1 = await getEdgelessSelectedRect(page);
     await page.mouse.click(box1.x + 10, box1.y + 10);
     await pressBackspace(page);
-    await assertBlockCount(page, 'note', 1);
+    await assertBlockCount(page, 'edgeless-note', 1);
     await pressForwardDelete(page);
-    await assertBlockCount(page, 'note', 1);
+    await assertBlockCount(page, 'edgeless-note', 1);
   });
 });
 

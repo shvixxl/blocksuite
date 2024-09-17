@@ -4,11 +4,12 @@ import type {
   DataViewDataType,
   InsertToPosition,
 } from '../database-block/data-view/index.js';
+import type { Column } from '../database-block/data-view/view/presets/table/types.js';
+
 import {
   arrayMove,
   insertPositionToIndex,
 } from '../database-block/data-view/utils/insert.js';
-import type { Column } from '../database-block/data-view/view/presets/table/types.js';
 
 type Props = {
   title: string;
@@ -22,6 +23,12 @@ export class DataViewBlockModel extends BlockModel<Props> {
     super();
   }
 
+  applyViewsUpdate() {
+    this.doc.updateBlock(this, {
+      views: this.views,
+    });
+  }
+
   deleteView(id: string) {
     this.doc.captureSync();
     this.doc.transact(() => {
@@ -29,26 +36,6 @@ export class DataViewBlockModel extends BlockModel<Props> {
     });
   }
 
-  updateView(
-    id: string,
-    update: (data: DataViewDataType) => Partial<DataViewDataType>
-  ) {
-    this.doc.transact(() => {
-      this.views = this.views.map(v => {
-        if (v.id !== id) {
-          return v;
-        }
-        return { ...v, ...(update(v) as DataViewDataType) };
-      });
-    });
-    this.applyViewsUpdate();
-  }
-
-  applyViewsUpdate() {
-    this.doc.updateBlock(this, {
-      views: this.views,
-    });
-  }
   duplicateView(id: string): string {
     const newId = this.doc.generateBlockId();
     this.doc.transact(() => {
@@ -64,6 +51,7 @@ export class DataViewBlockModel extends BlockModel<Props> {
     });
     return newId;
   }
+
   moveViewTo(id: string, position: InsertToPosition) {
     this.doc.transact(() => {
       this.views = arrayMove(
@@ -71,6 +59,21 @@ export class DataViewBlockModel extends BlockModel<Props> {
         v => v.id === id,
         arr => insertPositionToIndex(position, arr)
       );
+    });
+    this.applyViewsUpdate();
+  }
+
+  updateView(
+    id: string,
+    update: (data: DataViewDataType) => Partial<DataViewDataType>
+  ) {
+    this.doc.transact(() => {
+      this.views = this.views.map(v => {
+        if (v.id !== id) {
+          return v;
+        }
+        return { ...v, ...(update(v) as DataViewDataType) };
+      });
     });
     this.applyViewsUpdate();
   }

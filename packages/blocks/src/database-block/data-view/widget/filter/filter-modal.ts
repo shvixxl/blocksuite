@@ -1,13 +1,12 @@
-import './filter-group.js';
-import './filter-root.js';
-
 import { ShadowlessElement, WithDisposable } from '@blocksuite/block-std';
-import type { ReferenceElement } from '@floating-ui/dom';
 import { css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
-import { createPopup } from '../../../../_common/components/index.js';
 import type { FilterGroup, Variable } from '../../common/ast.js';
+
+import { createPopup } from '../../../../_common/components/index.js';
+import './filter-group.js';
+import './filter-root.js';
 
 @customElement('advanced-filter-modal')
 export class AdvancedFilterModal extends WithDisposable(ShadowlessElement) {
@@ -66,20 +65,6 @@ export class AdvancedFilterModal extends WithDisposable(ShadowlessElement) {
       background-color: var(--affine-hover-color);
     }
   `;
-  @property({ attribute: false })
-  accessor isRoot = false;
-  @property({ attribute: false })
-  accessor data!: FilterGroup;
-
-  @property({ attribute: false })
-  accessor vars!: Variable[];
-
-  @property({ attribute: false })
-  accessor setData!: (filter: FilterGroup) => void;
-  @property({ attribute: false })
-  accessor onDelete!: () => void;
-  @property({ attribute: false })
-  accessor onBack!: () => void;
 
   override connectedCallback() {
     super.connectedCallback();
@@ -131,6 +116,24 @@ export class AdvancedFilterModal extends WithDisposable(ShadowlessElement) {
       </div>
     `;
   }
+
+  @property({ attribute: false })
+  accessor data!: FilterGroup;
+
+  @property({ attribute: false })
+  accessor isRoot = false;
+
+  @property({ attribute: false })
+  accessor onBack!: () => void;
+
+  @property({ attribute: false })
+  accessor onDelete!: () => void;
+
+  @property({ attribute: false })
+  accessor setData!: (filter: FilterGroup) => void;
+
+  @property({ attribute: false })
+  accessor vars!: Variable[];
 }
 
 declare global {
@@ -139,7 +142,7 @@ declare global {
   }
 }
 export const popFilterModal = (
-  target: ReferenceElement,
+  target: HTMLElement,
   props: {
     isRoot: boolean;
     vars: Variable[];

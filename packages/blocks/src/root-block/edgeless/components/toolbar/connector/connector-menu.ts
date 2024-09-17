@@ -1,21 +1,22 @@
-import '../../panel/one-row-color-panel.js';
-import '../common/slide-menu.js';
-
-import { css, html, LitElement, nothing } from 'lit';
+import { LitElement, css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
+
+import type { Color } from '../../../../../surface-block/consts.js';
+import type { EdgelessTool } from '../../../types.js';
+import type { ColorEvent } from '../../panel/color-panel.js';
+import type { LineWidthEvent } from '../../panel/line-width-panel.js';
 
 import {
   ConnectorCWithArrowIcon,
   ConnectorLWithArrowIcon,
   ConnectorXWithArrowIcon,
 } from '../../../../../_common/icons/index.js';
-import { type EdgelessTool } from '../../../../../_common/utils/index.js';
+import { ThemeObserver } from '../../../../../_common/theme/theme-observer.js';
 import { ConnectorMode } from '../../../../../surface-block/index.js';
-import type { EdgelessRootBlockComponent } from '../../../edgeless-root-block.js';
-import type { ColorEvent } from '../../panel/color-panel.js';
-import type { LineWidthEvent } from '../../panel/line-width-panel.js';
-
-const CONNECTOR_SUBMENU_WIDTH = 474;
+import { DEFAULT_CONNECTOR_COLOR } from '../../panel/color-panel.js';
+import '../../panel/one-row-color-panel.js';
+import '../common/slide-menu.js';
+import { EdgelessToolbarToolMixin } from '../mixins/tool.mixin.js';
 
 function ConnectorModeButtonGroup(
   mode: ConnectorMode,
@@ -28,14 +29,6 @@ function ConnectorModeButtonGroup(
    */
   return html`
     <div class="connector-mode-button-group">
-      <edgeless-tool-icon-button
-        .active=${mode === ConnectorMode.Straight}
-        .activeMode=${'background'}
-        .tooltip=${'Straight'}
-        @click=${() => setConnectorMode({ mode: ConnectorMode.Straight })}
-      >
-        ${ConnectorLWithArrowIcon}
-      </edgeless-tool-icon-button>
       <edgeless-tool-icon-button
         .active=${mode === ConnectorMode.Curve}
         .activeMode=${'background'}
@@ -52,12 +45,22 @@ function ConnectorModeButtonGroup(
       >
         ${ConnectorXWithArrowIcon}
       </edgeless-tool-icon-button>
+      <edgeless-tool-icon-button
+        .active=${mode === ConnectorMode.Straight}
+        .activeMode=${'background'}
+        .tooltip=${'Straight'}
+        @click=${() => setConnectorMode({ mode: ConnectorMode.Straight })}
+      >
+        ${ConnectorLWithArrowIcon}
+      </edgeless-tool-icon-button>
     </div>
   `;
 }
 
 @customElement('edgeless-connector-menu')
-export class EdgelessConnectorMenu extends LitElement {
+export class EdgelessConnectorMenu extends EdgelessToolbarToolMixin(
+  LitElement
+) {
   static override styles = css`
     :host {
       position: absolute;
@@ -92,36 +95,18 @@ export class EdgelessConnectorMenu extends LitElement {
     }
   `;
 
-  @property({ attribute: false })
-  accessor edgeless!: EdgelessRootBlockComponent;
-
-  @property({ attribute: false })
-  accessor mode!: ConnectorMode;
-
-  @property({ attribute: false })
-  accessor stroke!: string;
-
-  @property({ attribute: false })
-  accessor strokeWidth!: number;
-
-  @property({ attribute: false })
-  accessor onChange!: (props: Record<string, unknown>) => void;
-
-  private get edgelessTool(): EdgelessTool {
-    return this.edgeless.edgelessTool;
-  }
+  override type: EdgelessTool['type'] = 'connector';
 
   override render() {
-    if (this.edgelessTool.type !== 'connector') return nothing;
-
     const { stroke, strokeWidth } = this;
     const connectorModeButtonGroup = ConnectorModeButtonGroup(
       this.mode,
       this.onChange
     );
+    const color = ThemeObserver.getColorValue(stroke, DEFAULT_CONNECTOR_COLOR);
 
     return html`
-      <edgeless-slide-menu .menuWidth=${CONNECTOR_SUBMENU_WIDTH}>
+      <edgeless-slide-menu>
         <div class="connector-submenu-content">
           ${connectorModeButtonGroup}
           <div class="submenu-divider"></div>
@@ -133,13 +118,28 @@ export class EdgelessConnectorMenu extends LitElement {
           </edgeless-line-width-panel>
           <div class="submenu-divider"></div>
           <edgeless-one-row-color-panel
-            .value=${stroke}
+            .value=${color}
+            .hasTransparent=${!this.edgeless.doc.awarenessStore.getFlag(
+              'enable_color_picker'
+            )}
             @select=${(e: ColorEvent) => this.onChange({ stroke: e.detail })}
           ></edgeless-one-row-color-panel>
         </div>
       </edgeless-slide-menu>
     `;
   }
+
+  @property({ attribute: false })
+  accessor mode!: ConnectorMode;
+
+  @property({ attribute: false })
+  accessor onChange!: (props: Record<string, unknown>) => void;
+
+  @property({ attribute: false })
+  accessor stroke!: Color;
+
+  @property({ attribute: false })
+  accessor strokeWidth!: number;
 }
 
 declare global {

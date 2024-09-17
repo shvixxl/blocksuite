@@ -1,16 +1,16 @@
 import { ShadowlessElement } from '@blocksuite/block-std';
-import { assertExists } from '@blocksuite/global/utils';
 import {
+  type ReferenceElement,
   autoUpdate,
   computePosition,
-  type ReferenceElement,
   size,
 } from '@floating-ui/dom';
 import { css, html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
+import type { SingleView } from '../../view-manager/single-view.js';
+
 import { createModal } from '../../../../_common/components/index.js';
-import type { DataViewManager } from '../../view/data-view-manager.js';
 import { CrossIcon } from '../icons/index.js';
 import { RecordDetail } from './detail.js';
 
@@ -21,13 +21,12 @@ class SideLayoutModal extends ShadowlessElement {
       display: flex;
       flex-direction: column;
       position: absolute;
-      right: 0;
       top: 0;
       bottom: 0;
-      width: 500px;
+      width: 1200px;
       background-color: var(--affine-background-overlay-panel-color);
       border-left: 0.5px solid var(--affine-border-color);
-      box-shadow: -5px 0px 10px 0px rgba(0, 0, 0, 0.05);
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
     }
 
     .side-modal-content {
@@ -65,19 +64,6 @@ class SideLayoutModal extends ShadowlessElement {
       background-color: var(--affine-hover-color);
     }
   `;
-  @property({ attribute: false })
-  accessor content: HTMLElement | undefined = undefined;
-  @property({ attribute: false })
-  accessor close: (() => void) | undefined = undefined;
-
-  renderOps() {
-    return html``;
-    // return html`
-    //   <div class='header-op' style='transform: rotate(180deg)'>
-    //     ${arrowUp}
-    //   </div>
-    //   <div class='header-op'>${arrowUp}</div>`;
-  }
 
   override render() {
     return html`
@@ -90,18 +76,30 @@ class SideLayoutModal extends ShadowlessElement {
       <div class="side-modal-content">${this.content}</div>
     `;
   }
+
+  renderOps() {
+    return html``;
+    // return html`
+    //   <div class='header-op' style='transform: rotate(180deg)'>
+    //     ${arrowUp}
+    //   </div>
+    //   <div class='header-op'>${arrowUp}</div>`;
+  }
+
+  @property({ attribute: false })
+  accessor close: (() => void) | undefined = undefined;
+
+  @property({ attribute: false })
+  accessor content: HTMLElement | undefined = undefined;
 }
 
 export const popSideDetail = (ops: {
-  attachTo: HTMLElement;
   target: ReferenceElement;
-  view: DataViewManager;
+  view: SingleView;
   rowId: string;
   onClose?: () => void;
 }) => {
-  const rootElement = ops.attachTo;
-  assertExists(rootElement);
-  const modal = createModal(rootElement);
+  const modal = createModal(document.body);
   // fit to the size of the body element
   const cancel = autoUpdate(ops.target, modal, () => {
     computePosition(ops.target, modal, {
@@ -132,4 +130,15 @@ export const popSideDetail = (ops: {
   sideContainer.close = close;
   modal.onclick = e => e.target === modal && close();
   modal.append(sideContainer);
+};
+
+export const createRecordDetail = (ops: {
+  view: SingleView;
+  rowId: string;
+}) => {
+  return html`<affine-data-view-record-detail
+    .view=${ops.view}
+    .rowId=${ops.rowId}
+    class="data-view-popup-container"
+  ></affine-data-view-record-detail>`;
 };

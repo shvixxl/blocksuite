@@ -1,15 +1,22 @@
-import type { Disposable, Slot } from '@blocksuite/global/utils';
+import type { ReadonlySignal } from '@lit-labs/preact-signals';
 
-import type { ColumnMeta } from '../../column/column-config.js';
-import type { ColumnConfig } from '../../column/index.js';
+import type { DatabaseFlags } from '../../../types.js';
+import type { ColumnConfig, ColumnMeta } from '../../column/column-config.js';
 import type { InsertToPosition } from '../../types.js';
 import type { UniComponent } from '../../utils/uni-component/index.js';
-import type { DataViewManager } from '../../view/data-view-manager.js';
-import { DEFAULT_COLUMN_WIDTH } from '../../view/presets/table/consts.js';
+import type {
+  DataViewDataType,
+  DataViewTypes,
+  ViewMeta,
+} from '../../view/data-view.js';
+import type { SingleView } from '../../view-manager/single-view.js';
+import type { ViewManager } from '../../view-manager/view-manager.js';
 import type { DataViewContextKey } from './context.js';
 
+import { DEFAULT_COLUMN_WIDTH } from '../../view/presets/table/consts.js';
+
 export type DetailSlotProps = {
-  view: DataViewManager;
+  view: SingleView;
   rowId: string;
 };
 
@@ -19,153 +26,153 @@ export interface DetailSlots {
 }
 
 export interface DataSource {
+  readonly$: ReadonlySignal<boolean>;
   addPropertyConfigList: ColumnConfig[];
 
-  getPropertyMeta(type: string): ColumnMeta;
+  properties$: ReadonlySignal<string[]>;
+  rows$: ReadonlySignal<string[]>;
 
-  properties: string[];
-  rows: string[];
-  cellGetValue: (rowId: string, propertyId: string) => unknown;
-  cellGetRenderValue: (rowId: string, propertyId: string) => unknown;
-  cellGetExtra: (rowId: string, columnId: string) => unknown;
-  cellChangeRenderValue: (
-    rowId: string,
-    propertyId: string,
-    value: unknown
-  ) => unknown;
-  cellChangeValue: (rowId: string, propertyId: string, value: unknown) => void;
-  rowAdd: (InsertToPosition: InsertToPosition | number) => string;
-  rowDelete: (ids: string[]) => void;
-  propertyGetName: (propertyId: string) => string;
-  propertyGetDefaultWidth: (propertyId: string) => number;
-  propertyGetType: (propertyId: string) => string;
-  propertyGetData: (propertyId: string) => Record<string, unknown>;
-  propertyGetReadonly: (columnId: string) => boolean;
-  propertyChangeName: (propertyId: string, name: string) => void;
-  propertyChangeType: (propertyId: string, type: string) => void;
-  propertyChangeData: (
-    propertyId: string,
-    data: Record<string, unknown>
-  ) => void;
-  propertyAdd: (insertToPosition: InsertToPosition, type?: string) => string;
-  propertyDelete: (id: string) => void;
-  propertyDuplicate: (columnId: string) => string;
+  cellGetValue(rowId: string, propertyId: string): unknown;
+  cellChangeValue(rowId: string, propertyId: string, value: unknown): void;
+  rowAdd(InsertToPosition: InsertToPosition | number): string;
+  rowDelete(ids: string[]): void;
+  propertyGetName(propertyId: string): string;
+  propertyGetDefaultWidth(propertyId: string): number;
+  propertyGetType(propertyId: string): string | undefined;
+  propertyGetData(propertyId: string): Record<string, unknown>;
+  propertyGetReadonly(columnId: string): boolean;
+  propertyChangeName(propertyId: string, name: string): void;
+  propertyChangeType(propertyId: string, type: string): void;
+  propertyChangeData(propertyId: string, data: Record<string, unknown>): void;
+  propertyAdd(insertToPosition: InsertToPosition, type?: string): string;
+  propertyDelete(id: string): void;
+  propertyDuplicate(columnId: string): string;
 
-  slots: {
-    update: Slot;
-  };
-
-  onCellUpdate: (
-    rowId: string,
-    propertyId: string,
-    callback: () => void
-  ) => Disposable;
-
+  featureFlags$: ReadonlySignal<DatabaseFlags>;
   detailSlots: DetailSlots;
+
+  getPropertyMeta(type: string): ColumnMeta;
 
   rowMove(rowId: string, position: InsertToPosition): void;
 
   getContext<T>(key: DataViewContextKey<T>): T | undefined;
+
+  viewManager: ViewManager;
+
+  viewDataList$: ReadonlySignal<DataViewDataType[]>;
+  viewDataAdd(viewType: DataViewTypes): string;
+  viewDataDuplicate(id: string): string;
+  viewDataDelete(viewId: string): void;
+  viewDataGet(viewId: string): DataViewDataType | undefined;
+  viewDataMoveTo(id: string, position: InsertToPosition): void;
+  viewDataUpdate<ViewData extends DataViewDataType>(
+    id: string,
+    updater: (data: ViewData) => Partial<ViewData>
+  ): void;
+
+  viewMetas: ViewMeta[];
+  viewMetaGet(type: string): ViewMeta;
+  viewMetaGetById(viewId: string): ViewMeta;
 }
 
-export abstract class BaseDataSource implements DataSource {
+export abstract class DataSourceBase implements DataSource {
   context = new Map<DataViewContextKey<unknown>, unknown>();
 
   getContext<T>(key: DataViewContextKey<T>): T | undefined {
     return this.context.get(key) as T;
   }
 
+  propertyGetDefaultWidth(_propertyId: string): number {
+    return DEFAULT_COLUMN_WIDTH;
+  }
+
+  propertyGetReadonly(_propertyId: string): boolean {
+    return false;
+  }
+
   protected setContext<T>(key: DataViewContextKey<T>, value: T): void {
     this.context.set(key, value);
   }
 
-  public abstract cellChangeValue(
+  get detailSlots(): DetailSlots {
+    return {};
+  }
+
+  abstract addPropertyConfigList: ColumnConfig[];
+
+  abstract cellChangeValue(
     rowId: string,
     propertyId: string,
     value: unknown
   ): void;
 
-  public cellChangeRenderValue(
+  abstract cellChangeValue(
     rowId: string,
     propertyId: string,
     value: unknown
-  ): void {
-    this.cellChangeValue(rowId, propertyId, value);
-  }
+  ): void;
 
-  public cellGetRenderValue(rowId: string, propertyId: string): unknown {
-    return this.cellGetValue(rowId, propertyId);
-  }
+  abstract cellGetValue(rowId: string, propertyId: string): unknown;
 
-  public cellGetExtra(_rowId: string, _propertyId: string): unknown {
-    return undefined;
-  }
+  abstract featureFlags$: ReadonlySignal<DatabaseFlags>;
 
-  public abstract cellGetValue(rowId: string, propertyId: string): unknown;
+  abstract getPropertyMeta(type: string): ColumnMeta;
 
-  public abstract properties: string[];
+  abstract properties$: ReadonlySignal<string[]>;
 
-  public abstract propertyAdd(
+  abstract propertyAdd(
     insertToPosition: InsertToPosition,
     type?: string
   ): string;
 
-  public abstract propertyChangeData(
+  abstract propertyChangeData(
     propertyId: string,
     data: Record<string, unknown>
   ): void;
 
-  public abstract propertyChangeName(propertyId: string, name: string): void;
+  abstract propertyChangeName(propertyId: string, name: string): void;
 
-  public abstract propertyChangeType(propertyId: string, type: string): void;
+  abstract propertyChangeType(propertyId: string, type: string): void;
 
-  public abstract propertyDelete(id: string): void;
+  abstract propertyDelete(id: string): void;
 
-  public abstract propertyDuplicate(columnId: string): string;
+  abstract propertyDuplicate(columnId: string): string;
 
-  public abstract propertyGetData(propertyId: string): Record<string, unknown>;
+  abstract propertyGetData(propertyId: string): Record<string, unknown>;
 
-  public propertyGetReadonly(_propertyId: string): boolean {
-    return false;
-  }
+  abstract propertyGetName(propertyId: string): string;
 
-  public propertyGetDefaultWidth(_propertyId: string): number {
-    return DEFAULT_COLUMN_WIDTH;
-  }
+  abstract propertyGetType(propertyId: string): string;
 
-  onCellUpdate(
-    _rowId: string,
-    _propertyId: string,
-    _callback: () => void
-  ): Disposable {
-    return {
-      dispose: () => {
-        //
-      },
-    };
-  }
+  abstract readonly$: ReadonlySignal<boolean>;
 
-  public abstract propertyGetName(propertyId: string): string;
+  abstract rowAdd(InsertToPosition: InsertToPosition | number): string;
 
-  public abstract propertyGetType(propertyId: string): string;
+  abstract rowDelete(ids: string[]): void;
 
-  public abstract rowAdd(InsertToPosition: InsertToPosition | number): string;
+  abstract rowMove(rowId: string, position: InsertToPosition): void;
+  abstract rows$: ReadonlySignal<string[]>;
 
-  public abstract rowDelete(ids: string[]): void;
+  abstract viewDataAdd(viewType: DataViewTypes): string;
 
-  public abstract rows: string[];
+  abstract viewDataDelete(viewId: string): void;
 
-  public abstract slots: {
-    update: Slot;
-  };
+  abstract viewDataDuplicate(id: string): string;
 
-  public abstract addPropertyConfigList: ColumnConfig[];
+  abstract viewDataGet(viewId: string): DataViewDataType;
 
-  public abstract getPropertyMeta(type: string): ColumnMeta;
+  abstract viewDataList$: ReadonlySignal<DataViewDataType[]>;
 
-  public get detailSlots(): DetailSlots {
-    return {};
-  }
+  abstract viewDataMoveTo(id: string, position: InsertToPosition): void;
 
-  public abstract rowMove(rowId: string, position: InsertToPosition): void;
+  abstract viewDataUpdate<ViewData extends DataViewDataType>(
+    id: string,
+    updater: (data: ViewData) => Partial<ViewData>
+  ): void;
+
+  abstract viewManager: ViewManager;
+  abstract viewMetaGet(type: string): ViewMeta;
+  abstract viewMetaGetById(viewId: string): ViewMeta;
+
+  abstract viewMetas: ViewMeta[];
 }

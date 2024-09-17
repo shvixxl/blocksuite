@@ -13,10 +13,15 @@ type AssetsManagerConfig = {
 
 export class AssetsManager {
   private readonly _assetsMap = new Map<string, Blob>();
+
   private readonly _blob: BlobCRUD;
 
   constructor(options: AssetsManagerConfig) {
     this._blob = options.blob;
+  }
+
+  cleanup() {
+    this._assetsMap.clear();
   }
 
   getAssets() {
@@ -25,10 +30,6 @@ export class AssetsManager {
 
   isEmpty() {
     return this._assetsMap.size === 0;
-  }
-
-  cleanup() {
-    this._assetsMap.clear();
   }
 
   async readFromBlob(blobId: string) {

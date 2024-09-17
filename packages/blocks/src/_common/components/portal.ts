@@ -1,18 +1,18 @@
-import { assertExists, Slot } from '@blocksuite/global/utils';
+import { Slot, assertExists } from '@blocksuite/global/utils';
 import {
-  autoUpdate,
   type AutoUpdateOptions,
-  computePosition,
   type ComputePositionConfig,
   type ComputePositionReturn,
   type ReferenceElement,
+  autoUpdate,
+  computePosition,
 } from '@floating-ui/dom';
 import {
-  html,
   LitElement,
-  render,
   type RenderOptions,
   type TemplateResult,
+  html,
+  render,
 } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 
@@ -34,21 +34,7 @@ import { customElement, property } from 'lit/decorators.js';
  */
 @customElement('blocksuite-portal')
 export class Portal extends LitElement {
-  @property({ attribute: false })
-  accessor container = document.body;
-
-  @property({ attribute: false })
-  accessor template = html``;
-
-  @property({ attribute: false })
-  accessor shadowDom: boolean | ShadowRootInit = true;
-
   private _portalRoot: HTMLElement | null = null;
-
-  override disconnectedCallback(): void {
-    super.disconnectedCallback();
-    this._portalRoot?.remove();
-  }
 
   override createRenderRoot() {
     const portalRoot = document.createElement('div');
@@ -58,15 +44,29 @@ export class Portal extends LitElement {
           ...(typeof this.shadowDom !== 'boolean' ? this.shadowDom : {}),
         })
       : portalRoot;
-    portalRoot.classList.add('blocksuite-portal', 'blocksuite-overlay');
+    portalRoot.classList.add('blocksuite-portal');
     this.container.append(portalRoot);
     this._portalRoot = portalRoot;
     return renderRoot;
   }
 
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._portalRoot?.remove();
+  }
+
   override render() {
     return this.template;
   }
+
+  @property({ attribute: false })
+  accessor container = document.body;
+
+  @property({ attribute: false })
+  accessor shadowDom: boolean | ShadowRootInit = true;
+
+  @property({ attribute: false })
+  accessor template = html``;
 }
 
 declare global {
@@ -108,6 +108,8 @@ type PortalOptions = {
    * If true, the portalRoot will be added a class `blocksuite-portal`. It's useful for finding the portalRoot.
    */
   identifyWrapper?: boolean;
+
+  portalStyles?: Record<string, string | number | undefined | null>;
 };
 
 /**
@@ -127,7 +129,7 @@ export function createSimplePortal({
 }: PortalOptions) {
   const portalRoot = document.createElement('div');
   if (identifyWrapper) {
-    portalRoot.classList.add('blocksuite-portal', 'blocksuite-overlay');
+    portalRoot.classList.add('blocksuite-portal');
   }
   if (shadowDom) {
     portalRoot.attachShadow({
@@ -295,6 +297,8 @@ export function createLitPortal({
   portalRoot.style.position = 'fixed';
   portalRoot.style.left = '0';
   portalRoot.style.top = '0';
+
+  Object.assign(portalRoot.style, portalOptions.portalStyles);
 
   const computePositionOptions =
     positionConfigOrFn instanceof Function

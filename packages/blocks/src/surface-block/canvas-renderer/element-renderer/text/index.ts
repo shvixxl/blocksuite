@@ -1,5 +1,6 @@
 import type { TextElementModel } from '../../../element-model/text.js';
 import type { Renderer } from '../../renderer.js';
+
 import {
   deltaInsertsToChunks,
   getFontString,
@@ -15,15 +16,8 @@ export function text(
   matrix: DOMMatrix,
   renderer: Renderer
 ) {
-  const {
-    color,
-    fontSize,
-    fontWeight,
-    fontStyle,
-    fontFamily,
-    textAlign,
-    rotate,
-  } = model;
+  const { fontSize, fontWeight, fontStyle, fontFamily, textAlign, rotate } =
+    model;
   const [, , w, h] = model.deserializedXYWH;
   const cx = w / 2;
   const cy = h / 2;
@@ -41,12 +35,14 @@ export function text(
   });
   const deltas = wrapTextDeltas(model.text, font, w);
   const lines = deltaInsertsToChunks(deltas);
-  const lineHeightPx = getLineHeight(fontFamily, fontSize);
+  const lineHeightPx = getLineHeight(fontFamily, fontSize, fontWeight);
   const horizontalOffset =
     textAlign === 'center' ? w / 2 : textAlign === 'right' ? w : 0;
 
+  const color = renderer.getColorValue(model.color, '#000000', true);
+
   ctx.font = font;
-  ctx.fillStyle = renderer.getVariableColor(color);
+  ctx.fillStyle = color;
   ctx.textAlign = textAlign;
   ctx.textBaseline = 'ideographic';
 

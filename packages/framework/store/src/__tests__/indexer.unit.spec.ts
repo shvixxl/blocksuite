@@ -3,7 +3,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { applyUpdate, encodeStateAsUpdate } from 'yjs';
 
-import { DocCollection, Generator, Schema } from '../index.js';
+import { DocCollection, IdGeneratorType, Schema } from '../index.js';
 // Use manual per-module import/export to support vitest environment on Node.js
 import {
   NoteBlockSchema,
@@ -18,7 +18,7 @@ export const BlockSchemas = [
 ];
 
 function createTestOptions() {
-  const idGenerator = Generator.AutoIncrement;
+  const idGenerator = IdGeneratorType.AutoIncrement;
   const schema = new Schema();
   schema.register(BlockSchemas);
   return { id: 'test-collection', idGenerator, schema };
@@ -27,6 +27,7 @@ function createTestOptions() {
 function createTestDoc(pageId = 'doc:home', collection?: DocCollection) {
   const options = createTestOptions();
   const _collection = collection || new DocCollection(options);
+  _collection.meta.initialize();
   const doc = _collection.createDoc({ id: pageId });
   doc.load();
   return doc;
@@ -113,6 +114,7 @@ describe('collection.search works', () => {
       schema,
       id: 'test',
     });
+    collection2.meta.initialize();
     const doc2 = collection2.createDoc({
       id: 'doc:home',
     });
@@ -133,7 +135,7 @@ describe('backlink works', () => {
     const doc = createTestDoc();
     const collection = doc.collection;
     const subpage = createTestDoc('doc1', collection);
-    const backlinkIndexer = collection.indexer.backlink;
+    const backlinkIndexer = collection.indexer.backlink!;
 
     const rootId = doc.addBlock('affine:page', {
       title: new doc.Text(''),
@@ -177,7 +179,7 @@ describe('backlink works', () => {
     const doc0 = createTestDoc();
     const collection = doc0.collection;
     const doc1 = createTestDoc('space:doc1', collection);
-    const backlinkIndexer = collection.indexer.backlink;
+    const backlinkIndexer = collection.indexer.backlink!;
 
     const doc0Id = doc0.addBlock('affine:page');
     const note0Id = doc0.addBlock('affine:note', {}, doc0Id);

@@ -1,7 +1,8 @@
 import type { Op, OpSet, ResolvedOptions } from '../core.js';
 import type { Line, Point } from '../geometry.js';
-import { lineLength } from '../geometry.js';
 import type { PatternFiller, RenderHelper } from './filler-interface.js';
+
+import { lineLength } from '../geometry.js';
 import { polygonHachureLines } from './scan-line-hachure.js';
 
 export class DashedFiller implements PatternFiller {
@@ -9,11 +10,6 @@ export class DashedFiller implements PatternFiller {
 
   constructor(helper: RenderHelper) {
     this.helper = helper;
-  }
-
-  fillPolygons(polygonList: Point[][], o: ResolvedOptions): OpSet {
-    const lines = polygonHachureLines(polygonList, o);
-    return { type: 'fillSketch', ops: this.dashedLine(lines, o) };
   }
 
   private dashedLine(lines: Line[], o: ResolvedOptions): Op[] {
@@ -58,5 +54,10 @@ export class DashedFiller implements PatternFiller {
       }
     });
     return ops;
+  }
+
+  fillPolygons(polygonList: Point[][], o: ResolvedOptions): OpSet {
+    const lines = polygonHachureLines(polygonList, o);
+    return { type: 'fillSketch', ops: this.dashedLine(lines, o) };
   }
 }

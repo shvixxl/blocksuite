@@ -1,9 +1,11 @@
-import { type Disposable } from '@blocksuite/global/utils';
+import type { Disposable } from '@blocksuite/global/utils';
+
+import { autoUpdate } from '@floating-ui/dom';
 import {
+  type Rect,
   autoPlacement,
   computePosition,
   offset,
-  type Rect,
   shift,
   size,
 } from '@floating-ui/dom';
@@ -49,11 +51,20 @@ export function createButtonPopper(
   stateUpdated: (state: { display: Display }) => void = () => {
     /** DEFAULT EMPTY FUNCTION */
   },
-  mainAxis?: number,
-  crossAxis?: number,
-  rootBoundary?: Rect | (() => Rect | undefined)
+  {
+    mainAxis,
+    crossAxis,
+    rootBoundary,
+    ignoreShift,
+  }: {
+    mainAxis?: number;
+    crossAxis?: number;
+    rootBoundary?: Rect | (() => Rect | undefined);
+    ignoreShift?: boolean;
+  } = {}
 ) {
   let display: Display = 'hidden';
+  let cleanup: (() => void) | void;
 
   const originMaxHeight = window.getComputedStyle(popperElement).maxHeight;
 
@@ -84,7 +95,11 @@ export function createButtonPopper(
         }),
       ],
     })
-      .then(({ x, y }) => {
+      .then(({ x, y, middlewareData: data }) => {
+        if (!ignoreShift) {
+          x += data.shift?.x ?? 0;
+          y += data.shift?.y ?? 0;
+        }
         Object.assign(popperElement.style, {
           position: 'absolute',
           zIndex: 1,
@@ -95,12 +110,21 @@ export function createButtonPopper(
       .catch(console.error);
   }
 
-  const show = () => {
-    if (display === 'show') return;
-    popperElement.setAttribute(ATTR_SHOW, '');
-    display = 'show';
-    stateUpdated({ display });
-    compute();
+  const show = (force = false) => {
+    const displayed = display === 'show';
+
+    if (displayed && !force) return;
+
+    if (!displayed) {
+      popperElement.setAttribute(ATTR_SHOW, '');
+      display = 'show';
+      stateUpdated({ display });
+    }
+
+    cleanup?.();
+    cleanup = autoUpdate(reference, popperElement, compute, {
+      animationFrame: true,
+    });
   };
 
   const hide = () => {
@@ -108,7 +132,7 @@ export function createButtonPopper(
     popperElement.removeAttribute(ATTR_SHOW);
     display = 'hidden';
     stateUpdated({ display });
-    compute();
+    cleanup?.();
   };
 
   const toggle = () => {
@@ -129,6 +153,7 @@ export function createButtonPopper(
     hide,
     toggle,
     dispose: () => {
+      cleanup?.();
       clickAway.dispose();
     },
   };

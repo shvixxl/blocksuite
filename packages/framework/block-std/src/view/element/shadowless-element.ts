@@ -1,4 +1,5 @@
 import type { CSSResultGroup, CSSResultOrNative } from 'lit';
+
 import { CSSResult, LitElement } from 'lit';
 
 export class ShadowlessElement extends LitElement {

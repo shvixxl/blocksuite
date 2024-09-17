@@ -107,9 +107,10 @@ literalMatcher.register(tArray(tTag.create()), {
               type: 'checkbox',
               name: tag.value,
               checked: list.includes(tag.id),
-              label: html` <div class="dv-round-4" style=${styles}>
-                ${tag.value}
-              </div>`,
+              label: () =>
+                html` <div class="dv-round-4" style=${styles}>
+                  ${tag.value}
+                </div>`,
               select: checked => {
                 if (checked) {
                   list = list.filter(v => v !== tag.id);
@@ -148,9 +149,10 @@ literalMatcher.register(tTag.create(), {
             return {
               type: 'action',
               name: tag.value,
-              label: html` <div class="dv-round-4" style=${styles}>
-                ${tag.value}
-              </div>`,
+              label: () =>
+                html` <div class="dv-round-4" style=${styles}>
+                  ${tag.value}
+                </div>`,
               select: () => {
                 onChange(tag.id);
               },
@@ -165,7 +167,6 @@ literalMatcher.register(tDate.create(), {
   view: createUniComponentFromWebComponent(DateLiteral),
   popEdit: (position, { value, onChange }) => {
     const input = document.createElement('input');
-    input.classList.add('blocksuite-overlay');
     input.type = 'date';
     input.click();
     input.valueAsNumber = value as number;

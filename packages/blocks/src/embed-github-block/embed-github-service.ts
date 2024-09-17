@@ -11,15 +11,19 @@ import { queryEmbedGithubApiData, queryEmbedGithubData } from './utils.js';
 export class EmbedGithubBlockService extends BlockService<EmbedGithubModel> {
   private static readonly linkPreviewer = new LinkPreviewer();
 
-  queryUrlData = (embedGithubModel: EmbedGithubModel) => {
-    return queryEmbedGithubData(
-      embedGithubModel,
-      EmbedGithubBlockService.linkPreviewer
-    );
+  static setLinkPreviewEndpoint =
+    EmbedGithubBlockService.linkPreviewer.setEndpoint;
+
+  queryApiData = (embedGithubModel: EmbedGithubModel, signal?: AbortSignal) => {
+    return queryEmbedGithubApiData(embedGithubModel, signal);
   };
 
-  queryApiData = (embedGithubModel: EmbedGithubModel) => {
-    return queryEmbedGithubApiData(embedGithubModel);
+  queryUrlData = (embedGithubModel: EmbedGithubModel, signal?: AbortSignal) => {
+    return queryEmbedGithubData(
+      embedGithubModel,
+      EmbedGithubBlockService.linkPreviewer,
+      signal
+    );
   };
 
   override mounted() {
@@ -35,7 +39,4 @@ export class EmbedGithubBlockService extends BlockService<EmbedGithubModel> {
       });
     });
   }
-
-  static setLinkPreviewEndpoint =
-    EmbedGithubBlockService.linkPreviewer.setEndpoint;
 }

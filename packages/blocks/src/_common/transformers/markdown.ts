@@ -1,5 +1,6 @@
-import { assertExists } from '@blocksuite/global/utils';
 import type { Doc } from '@blocksuite/store';
+
+import { assertExists } from '@blocksuite/global/utils';
 import { Job } from '@blocksuite/store';
 
 import { MarkdownAdapter } from '../adapters/index.js';
@@ -10,7 +11,10 @@ async function exportDoc(doc: Doc) {
   const job = new Job({ collection: doc.collection });
   const snapshot = await job.docToSnapshot(doc);
 
-  const adapter = new MarkdownAdapter();
+  const adapter = new MarkdownAdapter(job);
+  if (!snapshot) {
+    return;
+  }
 
   const markdownResult = await adapter.fromDocSnapshot({
     snapshot,
@@ -50,8 +54,7 @@ async function importMarkdown({
     collection: doc.collection,
     middlewares: [defaultImageProxyMiddleware],
   });
-  const adapter = new MarkdownAdapter();
-  adapter.applyConfigs(job.adapterConfigs);
+  const adapter = new MarkdownAdapter(job);
   const snapshot = await adapter.toSliceSnapshot({
     file: markdown,
     assets: job.assetsManager,

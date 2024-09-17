@@ -1,25 +1,27 @@
 import type { BlockService } from '@blocksuite/block-std';
 import type { EditorHost } from '@blocksuite/block-std';
-import { assertExists } from '@blocksuite/global/utils';
+import type { IVec } from '@blocksuite/global/utils';
 import type { BlockModel } from '@blocksuite/store';
 
+import { Point } from '@blocksuite/global/utils';
+import { assertExists } from '@blocksuite/global/utils';
+
+import type { DragIndicator } from './drag-indicator.js';
+
 import {
-  calcDropTarget,
   type DropResult,
-  getClosestBlockElementByPoint,
+  calcDropTarget,
+  getClosestBlockComponentByPoint,
   getModelByBlockComponent,
-  type IPoint,
   isInsidePageEditor,
   matchFlavours,
-  Point,
 } from '../../_common/utils/index.js';
-import type { DragIndicator } from './drag-indicator.js';
 
 export type onDropProps = {
   files: File[];
   targetModel: BlockModel | null;
   place: 'before' | 'after';
-  point: IPoint;
+  point: IVec;
 };
 
 export type FileDropOptions = {
@@ -34,22 +36,87 @@ export type FileDropOptions = {
 
 export class FileDropManager {
   private _blockService: BlockService;
-  private _fileDropOptions: FileDropOptions;
 
   private static _dropResult: DropResult | null = null;
+
+  private _fileDropOptions: FileDropOptions;
+
   private _indicator!: DragIndicator;
+
+  private _onDrop = (event: DragEvent) => {
+    this._indicator.rect = null;
+
+    const { onDrop } = this._fileDropOptions;
+    if (!onDrop) return;
+
+    const dataTransfer = event.dataTransfer;
+    if (!dataTransfer) return;
+
+    const effectAllowed = dataTransfer.effectAllowed;
+    if (effectAllowed === 'none') return;
+
+    const droppedFiles = dataTransfer.files;
+    if (!droppedFiles || !droppedFiles.length) return;
+
+    event.preventDefault();
+
+    const { targetModel, type: place } = this;
+    const { x, y } = event;
+
+    onDrop({
+      files: [...droppedFiles],
+      targetModel,
+      place,
+      point: [x, y],
+    })?.catch(console.error);
+  };
+
+  onDragLeave = () => {
+    FileDropManager._dropResult = null;
+    this._indicator.rect = null;
+  };
+
+  onDragOver = (event: DragEvent) => {
+    event.preventDefault();
+
+    const dataTransfer = event.dataTransfer;
+    if (!dataTransfer) return;
+
+    const effectAllowed = dataTransfer.effectAllowed;
+    if (effectAllowed === 'none') return;
+
+    const { clientX, clientY } = event;
+    const point = new Point(clientX, clientY);
+    const element = getClosestBlockComponentByPoint(point.clone());
+
+    let result: DropResult | null = null;
+    if (element) {
+      const model = getModelByBlockComponent(element);
+      const parent = this.doc.getParent(model);
+      if (!matchFlavours(parent, ['affine:surface'])) {
+        result = calcDropTarget(point, model, element);
+      }
+    }
+    if (result) {
+      FileDropManager._dropResult = result;
+      this._indicator.rect = result.rect;
+    } else {
+      FileDropManager._dropResult = null;
+      this._indicator.rect = null;
+    }
+  };
 
   constructor(blockService: BlockService, fileDropOptions: FileDropOptions) {
     this._blockService = blockService;
     this._fileDropOptions = fileDropOptions;
 
-    this._indicator = <DragIndicator>(
-      document.querySelector('affine-drag-indicator')
-    );
+    this._indicator = document.querySelector(
+      'affine-drag-indicator'
+    ) as DragIndicator;
     if (!this._indicator) {
-      this._indicator = <DragIndicator>(
-        document.createElement('affine-drag-indicator')
-      );
+      this._indicator = document.createElement(
+        'affine-drag-indicator'
+      ) as DragIndicator;
       document.body.append(this._indicator);
     }
 
@@ -62,19 +129,12 @@ export class FileDropManager {
     }
   }
 
-  get editorHost(): EditorHost {
-    return this._blockService.std.host as EditorHost;
-  }
-
   get doc() {
     return this._blockService.doc;
   }
 
-  get type(): 'before' | 'after' {
-    return !FileDropManager._dropResult ||
-      FileDropManager._dropResult.type !== 'before'
-      ? 'after'
-      : 'before';
+  get editorHost(): EditorHost {
+    return this._blockService.std.host;
   }
 
   get targetModel(): BlockModel | null {
@@ -110,69 +170,10 @@ export class FileDropManager {
     return targetModel;
   }
 
-  onDragOver = (event: DragEvent) => {
-    event.preventDefault();
-
-    const dataTransfer = event.dataTransfer;
-    if (!dataTransfer) return;
-
-    const effectAllowed = dataTransfer.effectAllowed;
-    if (effectAllowed === 'none') return;
-
-    const { clientX, clientY } = event;
-    const point = new Point(clientX, clientY);
-    const element = getClosestBlockElementByPoint(point.clone());
-
-    let result: DropResult | null = null;
-    if (element) {
-      const model = getModelByBlockComponent(element);
-      const parent = this.doc.getParent(model);
-      if (!matchFlavours(parent, ['affine:surface'])) {
-        result = calcDropTarget(point, model, element);
-      }
-    }
-    if (result) {
-      FileDropManager._dropResult = result;
-      this._indicator.rect = result.rect;
-    } else {
-      FileDropManager._dropResult = null;
-      this._indicator.rect = null;
-    }
-  };
-
-  onDragLeave = () => {
-    FileDropManager._dropResult = null;
-    this._indicator.rect = null;
-  };
-
-  private _onDrop = (event: DragEvent) => {
-    this._indicator.rect = null;
-
-    const { onDrop } = this._fileDropOptions;
-    if (!onDrop) return;
-
-    const dataTransfer = event.dataTransfer;
-    if (!dataTransfer) return;
-
-    const effectAllowed = dataTransfer.effectAllowed;
-    if (effectAllowed === 'none') return;
-
-    const droppedFiles = dataTransfer.files;
-    if (!droppedFiles || !droppedFiles.length) return;
-
-    event.preventDefault();
-
-    const { targetModel, type: place } = this;
-    const { clientX, clientY } = event;
-
-    onDrop({
-      files: [...droppedFiles],
-      targetModel,
-      place,
-      point: {
-        x: clientX,
-        y: clientY,
-      },
-    })?.catch(console.error);
-  };
+  get type(): 'before' | 'after' {
+    return !FileDropManager._dropResult ||
+      FileDropManager._dropResult.type !== 'before'
+      ? 'after'
+      : 'before';
+  }
 }

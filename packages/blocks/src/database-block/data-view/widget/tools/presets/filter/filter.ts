@@ -1,12 +1,10 @@
-import '../../../filter/filter-group.js';
-
 import { css, html, nothing } from 'lit';
 import { customElement } from 'lit/decorators.js';
 
-import { eventToVRect } from '../../../../../../_common/components/index.js';
-import type { FilterGroup } from '../../../../common/ast.js';
+import { type FilterGroup, emptyFilterGroup } from '../../../../common/ast.js';
 import { FilterIcon } from '../../../../common/icons/index.js';
 import { popCreateFilter } from '../../../../common/ref/ref.js';
+import '../../../filter/filter-group.js';
 import { WidgetBase } from '../../../widget-base.js';
 
 const styles = css`
@@ -35,39 +33,19 @@ const styles = css`
 export class DataViewHeaderToolsFilter extends WidgetBase {
   static override styles = styles;
 
-  private get readonly() {
-    return this.view.readonly;
-  }
-
-  override connectedCallback() {
-    super.connectedCallback();
-    this.disposables.add(
-      this.view.slots.update.on(() => {
-        this.requestUpdate();
-      })
-    );
-  }
-
-  private get _filter() {
-    return this.view.filter;
+  private get _filter(): FilterGroup {
+    return this.view.filter$.value ?? emptyFilterGroup;
   }
 
   private set _filter(filter: FilterGroup) {
     this.view.updateFilter(filter);
   }
 
-  showToolBar(show: boolean) {
-    const tools = this.closest('data-view-header-tools');
-    if (tools) {
-      tools.showToolBar = show;
-    }
-  }
-
   private addFilter(event: MouseEvent) {
-    if (!this._filter.conditions.length && !this.view.filterVisible) {
+    if (!this._filter.conditions.length && !this.view.filterVisible$.value) {
       this.showToolBar(true);
-      popCreateFilter(eventToVRect(event), {
-        vars: this.view.vars,
+      popCreateFilter(event.target as HTMLElement, {
+        vars: this.view.vars$.value,
         onSelect: filter => {
           this._filter = {
             ...this._filter,
@@ -81,7 +59,11 @@ export class DataViewHeaderToolsFilter extends WidgetBase {
       });
       return;
     }
-    this.view.filterSetVisible(!this.view.filterVisible);
+    this.view.filterSetVisible(!this.view.filterVisible$.value);
+  }
+
+  private get readonly() {
+    return this.view.readonly$.value;
   }
 
   override render() {
@@ -92,6 +74,13 @@ export class DataViewHeaderToolsFilter extends WidgetBase {
     >
       ${FilterIcon} Filter
     </div>`;
+  }
+
+  showToolBar(show: boolean) {
+    const tools = this.closest('data-view-header-tools');
+    if (tools) {
+      tools.showToolBar = show;
+    }
   }
 }
 

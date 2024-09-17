@@ -1,13 +1,12 @@
-import { keys } from '../../../../../_common/utils/iterable.js';
-import type { Template, TemplateManager } from './template-type.js';
+import type {
+  Template,
+  TemplateCategory,
+  TemplateManager,
+} from './template-type.js';
 
-export const templates: { name: string; templates: () => Promise<object> }[] = [
-  // NOTE: disabled for bundle
-  // {
-  //   name: 'Paws and pals',
-  //   templates: () => import('./templates/stickers.js').then(val => val.default),
-  // },
-];
+import { keys } from '../../../../../_common/utils/iterable.js';
+
+export const templates: TemplateCategory[] = [];
 
 function lcs(text1: string, text2: string) {
   const dp: number[][] = Array.from(

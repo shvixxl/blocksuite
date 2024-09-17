@@ -1,20 +1,25 @@
-import {
-  type ConnectorElementModel,
-  isConnectorWithLabel,
-  type LocalConnectorElementModel,
-  type PointStyle,
+import type { PointLocation } from '@blocksuite/global/utils';
+
+import type {
+  ConnectorElementModel,
+  LocalConnectorElementModel,
+  PointStyle,
 } from '../../../element-model/connector.js';
-import { ConnectorMode } from '../../../element-model/connector.js';
-import type { PointLocation } from '../../../index.js';
-import { getBezierParameters } from '../../../utils/curve.js';
+import type { RoughCanvas } from '../../../rough/canvas.js';
 import type { Renderer } from '../../renderer.js';
+
 import {
+  ConnectorMode,
+  isConnectorWithLabel,
+} from '../../../element-model/connector.js';
+import { getBezierParameters } from '../../../utils/curve.js';
+import {
+  type TextDelta,
   deltaInsertsToChunks,
   getFontString,
   getLineHeight,
   getTextWidth,
   isRTL,
-  type TextDelta,
   wrapTextDeltas,
 } from '../text/utils.js';
 import {
@@ -30,7 +35,8 @@ export function connector(
   model: ConnectorElementModel | LocalConnectorElementModel,
   ctx: CanvasRenderingContext2D,
   matrix: DOMMatrix,
-  renderer: Renderer
+  renderer: Renderer,
+  rc: RoughCanvas
 ) {
   const {
     mode,
@@ -65,21 +71,40 @@ export function connector(
     dy = ly - y;
 
     const path = new Path2D();
-    path.rect(0 - offset / 2, 0 - offset / 2, w + offset, h + offset);
+    path.rect(-offset / 2, -offset / 2, w + offset, h + offset);
     path.rect(dx - 3 - 0.5, dy - 3 - 0.5, lw + 6 + 1, lh + 6 + 1);
     ctx.clip(path, 'evenodd');
   }
 
+  const strokeColor = renderer.getColorValue(model.stroke, '#000000', true);
+
   renderPoints(
     model,
     ctx,
-    renderer,
+    rc,
     points,
     strokeStyle === 'dash',
-    mode === ConnectorMode.Curve
+    mode === ConnectorMode.Curve,
+    strokeColor
   );
-  renderEndpoint(model, points, ctx, renderer, 'Front', frontEndpointStyle);
-  renderEndpoint(model, points, ctx, renderer, 'Rear', rearEndpointStyle);
+  renderEndpoint(
+    model,
+    points,
+    ctx,
+    rc,
+    'Front',
+    frontEndpointStyle,
+    strokeColor
+  );
+  renderEndpoint(
+    model,
+    points,
+    ctx,
+    rc,
+    'Rear',
+    rearEndpointStyle,
+    strokeColor
+  );
 
   if (hasLabel) {
     ctx.restore();
@@ -96,36 +121,37 @@ export function connector(
 function renderPoints(
   model: ConnectorElementModel | LocalConnectorElementModel,
   ctx: CanvasRenderingContext2D,
-  renderer: Renderer,
+  rc: RoughCanvas,
   points: PointLocation[],
   dash: boolean,
-  curve: boolean
+  curve: boolean,
+  stroke: string
 ) {
-  const { seed, stroke, strokeWidth, roughness, rough } = model;
-  const realStrokeColor = renderer.getVariableColor(stroke);
+  const { seed, strokeWidth, roughness, rough } = model;
 
   if (rough) {
     const options = {
       seed,
       roughness,
+      stroke,
       strokeLineDash: dash ? [12, 12] : undefined,
-      stroke: realStrokeColor,
       strokeWidth,
     };
     if (curve) {
       const b = getBezierParameters(points);
-      renderer.rc.path(
+      rc.path(
         `M${b[0][0]},${b[0][1]} C${b[1][0]},${b[1][1]} ${b[2][0]},${b[2][1]} ${b[3][0]},${b[3][1]}`,
         options
       );
     } else {
-      renderer.rc.linearPath(points as unknown as [number, number][], options);
+      rc.linearPath(points as unknown as [number, number][], options);
     }
   } else {
     ctx.save();
-    ctx.strokeStyle = realStrokeColor;
+    ctx.strokeStyle = stroke;
     ctx.lineWidth = strokeWidth;
     ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
     dash && ctx.setLineDash([12, 12]);
     ctx.beginPath();
     if (curve) {
@@ -163,12 +189,12 @@ function renderEndpoint(
   model: ConnectorElementModel | LocalConnectorElementModel,
   location: PointLocation[],
   ctx: CanvasRenderingContext2D,
-  renderer: Renderer,
+  rc: RoughCanvas,
   end: 'Front' | 'Rear',
-  style: PointStyle
+  style: PointStyle,
+  stroke: string
 ) {
-  const arrowOptions = getArrowOptions(end, model, renderer);
-  const rc = renderer.rc;
+  const arrowOptions = getArrowOptions(end, model, stroke);
 
   switch (style) {
     case 'Arrow':
@@ -212,11 +238,11 @@ function renderLabel(
     fontFamily,
   });
   const [, , w, h] = labelXYWH!;
-  const hw = w / 2;
-  const hh = h / 2;
+  const cx = w / 2;
+  const cy = h / 2;
   const deltas = wrapTextDeltas(text!, font, w);
   const lines = deltaInsertsToChunks(deltas);
-  const lineHeight = getLineHeight(fontFamily, fontSize);
+  const lineHeight = getLineHeight(fontFamily, fontSize, fontWeight);
   const textHeight = (lines.length - 1) * lineHeight * 0.5;
 
   ctx.setTransform(matrix);
@@ -224,7 +250,7 @@ function renderLabel(
   ctx.font = font;
   ctx.textAlign = textAlign;
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = renderer.getVariableColor(color);
+  ctx.fillStyle = renderer.getColorValue(color, '#000000', true);
 
   let textMaxWidth = textAlign === 'center' ? 0 : getMaxTextWidth(lines, font);
   if (hasMaxWidth && maxWidth > 0) {
@@ -255,7 +281,7 @@ function renderLabel(
             : rtl
               ? 0.5
               : -0.5);
-      ctx.fillText(str, x + hw, index * lineHeight - textHeight + hh);
+      ctx.fillText(str, x + cx, index * lineHeight - textHeight + cy);
 
       if (shouldTemporarilyAttach) {
         ctx.canvas.remove();

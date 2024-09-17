@@ -1,6 +1,9 @@
+import { BlockSuiteError, ErrorCode } from '@blocksuite/global/exceptions';
+
 import type { VElement, VLine } from '../components/index.js';
-import { INLINE_ROOT_ATTR, ZERO_WIDTH_SPACE } from '../consts.js';
 import type { DomPoint, TextPoint } from '../types.js';
+
+import { INLINE_ROOT_ATTR, ZERO_WIDTH_SPACE } from '../consts.js';
 import {
   isInlineRoot,
   isNativeTextInVText,
@@ -19,18 +22,19 @@ export function nativePointToTextPoint(
 
   if (isVElement(node)) {
     const texts = getTextNodesFromElement(node);
-    if (texts.length === 1) {
-      const vElement = texts[0].parentElement?.closest(
-        '[data-v-element="true"]'
-      );
-      if (
-        vElement instanceof HTMLElement &&
-        vElement.dataset.vEmbed === 'true'
-      ) {
-        return [texts[0], 0];
-      }
+    const vElement = texts[0].parentElement?.closest('[data-v-element="true"]');
+
+    if (
+      texts.length === 1 &&
+      vElement instanceof HTMLElement &&
+      vElement.dataset.vEmbed === 'true'
+    ) {
+      return [texts[0], 0];
     }
-    return texts[offset] ? [texts[offset], 0] : null;
+
+    if (texts.length > 0) {
+      return texts[offset] ? [texts[offset], 0] : null;
+    }
   }
 
   if (isVLine(node) || isInlineRoot(node)) {
@@ -56,16 +60,17 @@ export function textPointToDomPoint(
   rootElement: HTMLElement
 ): DomPoint | null {
   if (rootElement.dataset.vRoot !== 'true') {
-    throw new Error(
+    throw new BlockSuiteError(
+      ErrorCode.InlineEditorError,
       'textRangeToDomPoint should be called with editor root element'
     );
   }
 
-  if (!rootElement.contains(text)) {
-    return null;
-  }
+  if (!rootElement.contains(text)) return null;
 
   const texts = getTextNodesFromElement(rootElement);
+  if (texts.length === 0) return null;
+
   const goalIndex = texts.indexOf(text);
   let index = 0;
   for (const text of texts.slice(0, goalIndex)) {
@@ -78,13 +83,19 @@ export function textPointToDomPoint(
 
   const textParentElement = text.parentElement;
   if (!textParentElement) {
-    throw new Error('text element parent not found');
+    throw new BlockSuiteError(
+      ErrorCode.InlineEditorError,
+      'text element parent not found'
+    );
   }
 
   const lineElement = textParentElement.closest('v-line');
 
   if (!lineElement) {
-    throw new Error('line element not found');
+    throw new BlockSuiteError(
+      ErrorCode.InlineEditorError,
+      'line element not found'
+    );
   }
 
   const lineIndex = Array.from(rootElement.querySelectorAll('v-line')).indexOf(

@@ -3,10 +3,9 @@ import * as Y from 'yjs';
 
 import { Schema } from '../schema/index.js';
 import {
-  type BlockSelector,
   BlockViewType,
   DocCollection,
-  Generator,
+  IdGeneratorType,
 } from '../store/index.js';
 import {
   DividerBlockSchema,
@@ -26,7 +25,7 @@ const BlockSchemas = [
 ];
 
 function createTestOptions() {
-  const idGenerator = Generator.AutoIncrement;
+  const idGenerator = IdGeneratorType.AutoIncrement;
   const schema = new Schema();
   schema.register(BlockSchemas);
   return { id: 'test-collection', idGenerator, schema };
@@ -35,6 +34,7 @@ function createTestOptions() {
 test('trigger props updated', () => {
   const options = createTestOptions();
   const collection = new DocCollection(options);
+  collection.meta.initialize();
 
   const doc = collection.createDoc({ id: 'home' });
   doc.load();
@@ -94,6 +94,7 @@ test('trigger props updated', () => {
 test('stash and pop', () => {
   const options = createTestOptions();
   const collection = new DocCollection(options);
+  collection.meta.initialize();
 
   const doc = collection.createDoc({ id: 'home' });
   doc.load();
@@ -163,6 +164,7 @@ test('stash and pop', () => {
 test('always get latest value in onChange', () => {
   const options = createTestOptions();
   const collection = new DocCollection(options);
+  collection.meta.initialize();
 
   const doc = collection.createDoc({ id: 'home' });
   doc.load();
@@ -206,19 +208,24 @@ test('always get latest value in onChange', () => {
   expect(value).toEqual({ color: 'yellow' });
 });
 
-test('selector', () => {
+test('query', () => {
   const options = createTestOptions();
   const collection = new DocCollection(options);
+  collection.meta.initialize();
   const doc1 = collection.createDoc({ id: 'home' });
   doc1.load();
   const doc2 = collection.getDoc('home');
 
-  const selector: BlockSelector = block =>
-    block.flavour !== 'affine:list'
-      ? BlockViewType.Display
-      : BlockViewType.Hidden;
   const doc3 = collection.getDoc('home', {
-    selector,
+    query: {
+      mode: 'loose',
+      match: [
+        {
+          flavour: 'affine:list',
+          viewType: BlockViewType.Hidden,
+        },
+      ],
+    },
   });
   expect(doc1).toBe(doc2);
   expect(doc1).not.toBe(doc3);
@@ -241,6 +248,7 @@ test('selector', () => {
 test('local readonly', () => {
   const options = createTestOptions();
   const collection = new DocCollection(options);
+  collection.meta.initialize();
   const doc1 = collection.createDoc({ id: 'home' });
   doc1.load();
   const doc2 = collection.getDoc('home', { readonly: true });

@@ -1,7 +1,7 @@
 import type { EditorHost } from '@blocksuite/block-std';
 import type {
-  AffineAIPanelWidget,
   AIItemConfig,
+  AffineAIPanelWidget,
   EdgelessCopilotWidget,
   EdgelessElementToolbarWidget,
   EdgelessRootService,
@@ -9,17 +9,20 @@ import type {
   ShapeElementModel,
   SurfaceBlockModel,
 } from '@blocksuite/blocks';
+import type { TemplateResult } from 'lit';
+
 import {
   DeleteIcon,
   EDGELESS_ELEMENT_TOOLBAR_WIDGET,
   EmbedHtmlBlockSpec,
-  fitContent,
   ImageBlockModel,
   InsertBelowIcon,
   NoteDisplayMode,
   ResetIcon,
+  fitContent,
 } from '@blocksuite/blocks';
-import type { TemplateResult } from 'lit';
+
+import type { CtxRecord } from './types.js';
 
 import { AIPenIcon, ChatWithAIIcon } from '../_common/icons.js';
 import { insertFromMarkdown } from '../_common/markdown-utils.js';
@@ -40,7 +43,6 @@ import {
   getEdgelessService,
 } from '../utils/selection-utils.js';
 import { EXCLUDING_INSERT_ACTIONS, generatingStages } from './consts.js';
-import type { CtxRecord } from './types.js';
 
 type FinishConfig = Exclude<
   AffineAIPanelWidget['config'],
@@ -207,7 +209,7 @@ const imageHandler = (host: EditorHost) => {
       const [x, y] = edgelessRoot.service.viewport.toViewCoord(minX, minY);
 
       host.doc.transact(() => {
-        edgelessRoot.addImages([img], { x, y }, true).catch(console.error);
+        edgelessRoot.addImages([img], [x, y], true).catch(console.error);
       });
     })
     .catch(console.error);
@@ -226,7 +228,7 @@ export const responses: {
 
     const elements = ctx.get()[
       'selectedElements'
-    ] as BlockSuite.EdgelessModelType[];
+    ] as BlockSuite.EdgelessModel[];
     const data = ctx.get() as {
       node: MindMapNode;
     };
@@ -280,7 +282,7 @@ export const responses: {
     ) as SurfaceBlockModel[];
     const elements = ctx.get()[
       'selectedElements'
-    ] as BlockSuite.EdgelessModelType[];
+    ] as BlockSuite.EdgelessModel[];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = ctx.get() as any;
     let newGenerated = true;
@@ -306,6 +308,15 @@ export const responses: {
       children: data.node,
       style: data.style,
     });
+
+    edgelessService.telemetryService?.track('CanvasElementAdded', {
+      control: 'ai',
+      page: 'whiteboard editor',
+      module: 'toolbar',
+      segment: 'toolbar',
+      type: 'mindmap',
+    });
+
     const mindmap = surface.getElementById(mindmapId) as MindmapElementModel;
 
     host.doc.transact(() => {

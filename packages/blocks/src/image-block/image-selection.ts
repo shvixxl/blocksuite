@@ -6,8 +6,16 @@ const ImageSelectionSchema = z.object({
 });
 
 export class ImageSelection extends BaseSelection {
-  static override type = 'image';
   static override group = 'note';
+
+  static override type = 'image';
+
+  static override fromJSON(json: Record<string, unknown>): ImageSelection {
+    ImageSelectionSchema.parse(json);
+    return new ImageSelection({
+      blockId: json.blockId as string,
+    });
+  }
 
   override equals(other: BaseSelection): boolean {
     if (other instanceof ImageSelection) {
@@ -21,13 +29,6 @@ export class ImageSelection extends BaseSelection {
       type: this.type,
       blockId: this.blockId,
     };
-  }
-
-  static override fromJSON(json: Record<string, unknown>): ImageSelection {
-    ImageSelectionSchema.parse(json);
-    return new ImageSelection({
-      blockId: json.blockId as string,
-    });
   }
 }
 

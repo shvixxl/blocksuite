@@ -1,12 +1,13 @@
 import type { BlockSpec } from '@blocksuite/block-std';
+
 import { assertExists } from '@blocksuite/global/utils';
 
 import { SpecBuilder } from './spec-builder.js';
 
 export class SpecProvider {
-  static instance: SpecProvider;
+  private specMap = new Map<string, BlockSpec[]>();
 
-  private specMap: Map<string, BlockSpec[]> = new Map();
+  static instance: SpecProvider;
 
   private constructor() {}
 
@@ -23,8 +24,17 @@ export class SpecProvider {
     }
   }
 
-  hasSpec(id: string) {
-    return this.specMap.has(id);
+  clearSpec(id: string) {
+    this.specMap.delete(id);
+  }
+
+  extendSpec(id: string, newSpec: BlockSpec[]) {
+    const existingSpec = this.specMap.get(id);
+    if (!existingSpec) {
+      console.error(`Spec not found for ${id}`);
+      return;
+    }
+    this.specMap.set(id, [...existingSpec, ...newSpec]);
   }
 
   getSpec(id: string) {
@@ -33,7 +43,7 @@ export class SpecProvider {
     return new SpecBuilder(spec);
   }
 
-  clearSpec(id: string) {
-    this.specMap.delete(id);
+  hasSpec(id: string) {
+    return this.specMap.has(id);
   }
 }

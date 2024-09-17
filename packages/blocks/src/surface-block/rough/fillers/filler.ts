@@ -1,13 +1,14 @@
 import type { ResolvedOptions } from '../core.js';
+import type { PatternFiller, RenderHelper } from './filler-interface.js';
+
 import { DashedFiller } from './dashed-filler.js';
 import { DotFiller } from './dot-filler.js';
-import type { PatternFiller, RenderHelper } from './filler-interface.js';
 import { HachureFiller } from './hachure-filler.js';
 import { HatchFiller } from './hatch-filler.js';
 import { ZigZagFiller } from './zigzag-filler.js';
 import { ZigZagLineFiller } from './zigzag-line-filler.js';
 
-const fillers: { [name: string]: PatternFiller } = {};
+const fillers: Record<string, PatternFiller> = {};
 
 export function getFiller(
   o: ResolvedOptions,

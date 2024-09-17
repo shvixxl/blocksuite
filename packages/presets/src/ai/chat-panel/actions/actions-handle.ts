@@ -3,17 +3,15 @@ import type {
   EditorHost,
   TextSelection,
 } from '@blocksuite/block-std';
-import type {
-  EdgelessRootService,
-  ImageSelection,
-  SerializedXYWH,
-} from '@blocksuite/blocks';
+import type { EdgelessRootService, ImageSelection } from '@blocksuite/blocks';
+import type { SerializedXYWH } from '@blocksuite/global/utils';
+
 import {
   BlocksUtils,
-  Bound,
-  getElementsBound,
   NoteDisplayMode,
+  getElementsBound,
 } from '@blocksuite/blocks';
+import { Bound } from '@blocksuite/global/utils';
 
 import {
   CreateIcon,
@@ -139,7 +137,7 @@ export const EdgelessEditorActions = [
       reportResponse('result:add-note');
       const { doc } = host;
       const service = host.spec.getService<EdgelessRootService>('affine:page');
-      const elements = service.selection.elements;
+      const elements = service.selection.selectedElements;
 
       const props: { displayMode: NoteDisplayMode; xywh?: SerializedXYWH } = {
         displayMode: NoteDisplayMode.EdgelessOnly,

@@ -24,6 +24,10 @@ export const listPrefix = css`
     color: var(--affine-icon-color);
   }
 
+  .affine-list-block__todo-prefix.readonly {
+    cursor: default;
+  }
+
   .affine-list-block__todo-prefix > svg {
     width: 20px;
     height: 20px;
@@ -60,6 +64,10 @@ export const toggleStyles = css`
   .with-drag-handle .affine-block-children-container .toggle-icon {
     opacity: 0;
   }
+
+  .affine-list__collapsed {
+    display: none;
+  }
 `;
 
 export const listBlockStyles = css`
@@ -79,7 +87,6 @@ export const listBlockStyles = css`
   .affine-list-rich-text-wrapper {
     position: relative;
     display: flex;
-    position: relative;
   }
   .affine-list-rich-text-wrapper rich-text {
     flex: 1;

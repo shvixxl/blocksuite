@@ -23,6 +23,7 @@ export const progressColumnModelConfig = progressColumnType.modelConfig<number>(
       };
     },
     cellToJson: data => data ?? null,
+    isEmpty: () => false,
   }
 );
 
@@ -32,6 +33,6 @@ progressColumnModelConfig.addConvert('rich-text', (_column, cells) => ({
 }));
 
 progressColumnModelConfig.addConvert('number', (_column, cells) => ({
-  column: { decimal: 0 },
+  column: { decimal: 0, format: 'number' },
   cells: cells.map(v => v),
 }));
